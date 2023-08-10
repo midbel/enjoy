@@ -1,0 +1,940 @@
+package parser
+
+import (
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+
+	"github.com/midbel/enjoy/ast"
+	"github.com/midbel/enjoy/scanner"
+	"github.com/midbel/enjoy/token"
+)
+
+type (
+	prefixFunc func() (ast.Node, error)
+	infixFunc  func(ast.Node) (ast.Node, error)
+)
+
+type Parser struct {
+	prefix   map[rune]prefixFunc
+	infix    map[rune]infixFunc
+	keywords map[string]prefixFunc
+
+	scan *scanner.Scanner
+	curr token.Token
+	peek token.Token
+}
+
+func ParseString(str string) (ast.Node, error) {
+	return Parse(strings.NewReader(str))
+}
+
+func Parse(r io.Reader) (ast.Node, error) {
+	return NewParser(r).Parse()
+}
+
+func NewParser(r io.Reader) *Parser {
+	p := Parser{
+		scan:     scanner.Scan(r),
+		prefix:   make(map[rune]prefixFunc),
+		infix:    make(map[rune]infixFunc),
+		keywords: make(map[string]prefixFunc),
+	}
+
+	p.registerPrefix(token.Number, p.parseNumber)
+	p.registerPrefix(token.String, p.parseString)
+	p.registerPrefix(token.Boolean, p.parseBool)
+	p.registerPrefix(token.Ident, p.parseIdentifier)
+	p.registerPrefix(token.Keyword, p.parseKeyword)
+	p.registerPrefix(token.Template, p.parseTemplate)
+	p.registerPrefix(token.Add, p.parseUnary)
+	p.registerPrefix(token.Sub, p.parseUnary)
+	p.registerPrefix(token.Not, p.parseUnary)
+	p.registerPrefix(token.Bnot, p.parseUnary)
+	p.registerPrefix(token.Increment, p.parseUnary)
+	p.registerPrefix(token.Decrement, p.parseUnary)
+	p.registerPrefix(token.Lparen, p.parseGroup)
+	p.registerPrefix(token.Lbrace, p.parseObject)
+	p.registerPrefix(token.Lsquare, p.parseArray)
+	p.registerPrefix(token.Spread, p.parseSpread)
+
+	p.registerInfix(token.Eq, p.parseBinary)
+	p.registerInfix(token.Seq, p.parseBinary)
+	p.registerInfix(token.Ne, p.parseBinary)
+	p.registerInfix(token.Sne, p.parseBinary)
+	p.registerInfix(token.Lt, p.parseBinary)
+	p.registerInfix(token.Le, p.parseBinary)
+	p.registerInfix(token.Gt, p.parseBinary)
+	p.registerInfix(token.Ge, p.parseBinary)
+	p.registerInfix(token.Add, p.parseBinary)
+	p.registerInfix(token.Sub, p.parseBinary)
+	p.registerInfix(token.Mul, p.parseBinary)
+	p.registerInfix(token.Div, p.parseBinary)
+	p.registerInfix(token.Pow, p.parseBinary)
+	p.registerInfix(token.Mod, p.parseBinary)
+	p.registerInfix(token.Nullish, p.parseBinary)
+	p.registerInfix(token.And, p.parseBinary)
+	p.registerInfix(token.Or, p.parseBinary)
+	p.registerInfix(token.Lshift, p.parseBinary)
+	p.registerInfix(token.Rshift, p.parseBinary)
+	p.registerInfix(token.Band, p.parseBinary)
+	p.registerInfix(token.Bor, p.parseBinary)
+	p.registerInfix(token.Bxor, p.parseBinary)
+	p.registerInfix(token.Assign, p.parseAssign)
+	p.registerInfix(token.AddAssign, p.parseAssign)
+	p.registerInfix(token.SubAssign, p.parseAssign)
+	p.registerInfix(token.MulAssign, p.parseAssign)
+	p.registerInfix(token.DivAssign, p.parseAssign)
+	p.registerInfix(token.PowAssign, p.parseAssign)
+	p.registerInfix(token.ModAssign, p.parseAssign)
+	p.registerInfix(token.NullishAssign, p.parseAssign)
+	p.registerInfix(token.AndAssign, p.parseAssign)
+	p.registerInfix(token.OrAssign, p.parseAssign)
+	p.registerInfix(token.LshiftAssign, p.parseAssign)
+	p.registerInfix(token.RshiftAssign, p.parseAssign)
+	p.registerInfix(token.BandAssign, p.parseAssign)
+	p.registerInfix(token.BorAssign, p.parseAssign)
+	p.registerInfix(token.BxorAssign, p.parseAssign)
+	p.registerInfix(token.Question, p.parseTernary)
+	p.registerInfix(token.Lparen, p.parseCall)
+	p.registerInfix(token.Lsquare, p.parseIndex)
+	p.registerInfix(token.Arrow, p.parseArrow)
+	p.registerInfix(token.Dot, p.parseMember)
+	p.registerInfix(token.Optional, p.parseMember)
+	p.registerInfix(token.Comma, p.parseSequence)
+
+	p.registerKeyword("let", p.parseLet)
+	p.registerKeyword("const", p.parseConst)
+	p.registerKeyword("if", p.parseIf)
+	p.registerKeyword("else", p.parseElse)
+	p.registerKeyword("switch", p.parseSwitch)
+	p.registerKeyword("case", p.parseCase)
+	p.registerKeyword("for", p.parseFor)
+	p.registerKeyword("do", p.parseDo)
+	p.registerKeyword("while", p.parseWhile)
+	p.registerKeyword("break", p.parseBreak)
+	p.registerKeyword("continue", p.parseContinue)
+	p.registerKeyword("try", p.parseTry)
+	p.registerKeyword("catch", p.parseCatch)
+	p.registerKeyword("finally", p.parseFinally)
+	p.registerKeyword("throw", p.parseThrow)
+	p.registerKeyword("function", p.parseFunction)
+	p.registerKeyword("return", p.parseReturn)
+	p.registerKeyword("null", p.parseNull)
+	p.registerKeyword("undefined", p.parseUndefined)
+	p.registerKeyword("typeof", p.parseTypeOf)
+
+	p.next()
+	p.next()
+	return &p
+}
+
+func (p *Parser) Parse() (ast.Node, error) {
+	var b ast.BlockNode
+	for !p.done() {
+		p.skip(token.Comment)
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		b.Nodes = append(b.Nodes, n)
+		if p.is(token.EOL) {
+			p.next()
+		}
+		p.skip(token.Comment)
+	}
+	if len(b.Nodes) == 1 {
+		return b.Nodes[0], nil
+	}
+	return b, nil
+}
+
+func (p *Parser) parseNode(pow int) (ast.Node, error) {
+	fn, ok := p.prefix[p.curr.Type]
+	if !ok {
+		return nil, p.unexpected()
+	}
+	left, err := fn()
+	if err != nil {
+		return nil, err
+	}
+	for !p.done() && !p.eol() && pow < p.power() {
+		fn, ok := p.infix[p.curr.Type]
+		if !ok {
+			return nil, p.unexpected()
+		}
+		left, err = fn(left)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return left, nil
+}
+
+func (p *Parser) parseGroup() (ast.Node, error) {
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	n, err := p.parseSequence(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	return n, p.expect(token.Rparen)
+}
+
+func (p *Parser) parseSequence(left ast.Node) (ast.Node, error) {
+	var list ast.SeqNode
+	list.Nodes = append(list.Nodes, left)
+	for p.is(token.Comma) {
+		p.next()
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		list.Nodes = append(list.Nodes, n)
+	}
+	if len(list.Nodes) == 1 {
+		return list.Nodes[0], nil
+	}
+	return list, nil
+}
+
+func (p *Parser) parseLet() (ast.Node, error) {
+	p.next()
+	ident, err := p.parseNode(powUnary)
+	if err != nil {
+		return nil, err
+	}
+	node := ast.LetNode{
+		Ident: ident,
+	}
+	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
+		if !ok {
+			return nil, p.unexpected()
+		}
+		return node, nil
+	}
+	if err := p.expect(token.Assign); err != nil {
+		return nil, err
+	}
+	expr, err := p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	node.Expr = expr
+	return node, nil
+}
+
+func (p *Parser) parseConst() (ast.Node, error) {
+	p.next()
+	ident, err := p.parseNode(powUnary)
+	if err != nil {
+		return nil, err
+	}
+	node := ast.ConstNode{
+		Ident: ident,
+	}
+	if err := p.expect(token.Assign); err != nil {
+		return nil, err
+	}
+	expr, err := p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	node.Expr = expr
+	return node, nil
+}
+
+func (p *Parser) parseNull() (ast.Node, error) {
+	defer p.next()
+	return ast.NullNode{}, nil
+}
+
+func (p *Parser) parseUndefined() (ast.Node, error) {
+	defer p.next()
+	return ast.UndefinedNode{}, nil
+}
+
+func (p *Parser) parseTypeOf() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.TypeofNode
+		err  error
+	)
+	node.Node, err = p.parseNode(powLowest)
+	return node, err
+}
+
+func (p *Parser) parseIf() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.IfNode
+		err  error
+	)
+	node.Cdt, err = p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	node.Csq, err = p.parseBody()
+	if err != nil {
+		return nil, err
+	}
+	if p.is(token.Keyword) && p.curr.Literal == "else" {
+		node.Alt, err = p.parseKeyword()
+	}
+	return node, err
+}
+
+func (p *Parser) parseElse() (ast.Node, error) {
+	p.next()
+	if p.is(token.Keyword) && p.curr.Literal == "if" {
+		return p.parseKeyword()
+	}
+	return p.parseBody()
+}
+
+func (p *Parser) parseSwitch() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.SwitchNode
+		err  error
+	)
+	node.Cdt, err = p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	return node, err
+}
+
+func (p *Parser) parseCase() (ast.Node, error) {
+	return nil, nil
+}
+
+func (p *Parser) parseForeach() (ast.Node, error) {
+	p.next()
+	var (
+		in    bool
+		ident string
+		expr  ast.Node
+		body  ast.Node
+		err   error
+	)
+	if !p.is(token.Ident) {
+		return nil, p.unexpected()
+	}
+	ident = p.curr.Literal
+	p.next()
+	if !p.is(token.Keyword) && p.curr.Literal != "in" && p.curr.Literal != "of" {
+		return nil, p.unexpected()
+	}
+	in = p.curr.Literal == "in"
+	p.next()
+	if expr, err = p.parseNode(powLowest); err != nil {
+		return nil, err
+	}
+	if err = p.expect(token.Rparen); err != nil {
+		return nil, err
+	}
+	if body, err = p.parseBody(); err != nil {
+		return nil, err
+	}
+	var node ast.Node
+	if in {
+		node = ast.ForInNode{
+			Ident: ident,
+			Expr:  expr,
+			Body:  body,
+		}
+	} else {
+		node = ast.ForOfNode{
+			Ident: ident,
+			Expr:  expr,
+			Body:  body,
+		}
+	}
+	return node, nil
+}
+
+func (p *Parser) parseFor() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.ForNode
+		err  error
+	)
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	if p.is(token.Keyword) && p.curr.Literal == "let" {
+		return p.parseForeach()
+	}
+	if !p.is(token.EOL) {
+		node.Init, err = p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		if err = p.expect(token.EOL); err != nil {
+			return nil, err
+		}
+	}
+	if !p.is(token.EOL) {
+		node.Cdt, err = p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		if err = p.expect(token.EOL); err != nil {
+			return nil, err
+		}
+	}
+	if !p.is(token.Rparen) {
+		node.Incr, err = p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := p.expect(token.Rparen); err != nil {
+		return nil, err
+	}
+	node.Body, err = p.parseBody()
+	return node, err
+}
+
+func (p *Parser) parseDo() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.DoNode
+		err  error
+	)
+	node.Body, err = p.parseBody()
+	if err != nil {
+		return nil, err
+	}
+	node.Cdt, err = p.parseCondition()
+	return node, err
+}
+
+func (p *Parser) parseWhile() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.WhileNode
+		err  error
+	)
+	node.Cdt, err = p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	node.Body, err = p.parseBody()
+	return node, err
+}
+
+func (p *Parser) parseBreak() (ast.Node, error) {
+	p.next()
+	return ast.BreakNode{}, nil
+}
+
+func (p *Parser) parseContinue() (ast.Node, error) {
+	p.next()
+	return ast.ContinueNode{}, nil
+}
+
+func (p *Parser) parseTry() (ast.Node, error) {
+	var (
+		node ast.TryNode
+		err  error
+	)
+	node.Try, err = p.parseBody()
+	if err != nil {
+		return nil, err
+	}
+	if p.is(token.Keyword) && p.curr.Literal == "catch" {
+		node.Catch, err = p.parseKeyword()
+		if err != nil {
+			return nil, err
+		}
+		if p.is(token.Keyword) && p.curr.Literal == "finally" {
+			node.Finally, err = p.parseKeyword()
+		}
+	}
+	return node, err
+}
+
+func (p *Parser) parseCatch() (ast.Node, error) {
+	p.next()
+	var (
+		catch ast.CatchNode
+		err   error
+	)
+	catch.Ident, err = p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	catch.Body, err = p.parseBody()
+	return catch, err
+}
+
+func (p *Parser) parseFinally() (ast.Node, error) {
+	p.next()
+	return p.parseBody()
+}
+
+func (p *Parser) parseThrow() (ast.Node, error) {
+	p.next()
+	var (
+		throw ast.ThrowNode
+		err   error
+	)
+	throw.Node, err = p.parseNode(powLowest)
+	return throw, err
+}
+
+func (p *Parser) parseFunction() (ast.Node, error) {
+	p.next()
+	var (
+		fn  ast.FuncNode
+		err error
+	)
+	if p.is(token.Ident) {
+		fn.Ident = p.curr.Literal
+		p.next()
+	}
+	if fn.Args, err = p.parseArgs(); err != nil {
+		return nil, err
+	}
+	fn.Body, err = p.parseBody()
+	return fn, err
+}
+
+func (p *Parser) parseArgs() ([]ast.Node, error) {
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	var (
+		args []ast.Node
+		err  error
+	)
+	for !p.done() && !p.is(token.Rparen) {
+		if !p.is(token.Ident) {
+			return nil, p.unexpected()
+		}
+		a := ast.ArgNode{
+			Ident: p.curr.Literal,
+		}
+		p.next()
+		if p.is(token.Assign) {
+			p.next()
+			a.Value, err = p.parseNode(powLowest)
+			if err != nil {
+				return nil, err
+			}
+		}
+		args = append(args, a)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+			if p.is(token.Rparen) {
+				return nil, p.unexpected()
+			}
+		case p.is(token.Rparen):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return args, p.expect(token.Rparen)
+}
+
+func (p *Parser) parseReturn() (ast.Node, error) {
+	p.next()
+	var (
+		ret ast.ReturnNode
+		err error
+	)
+	ret.Node, err = p.parseNode(powLowest)
+	return ret, err
+}
+
+func (p *Parser) parseBinary(left ast.Node) (ast.Node, error) {
+	bin := ast.BinaryNode{
+		Op:   p.curr.Type,
+		Left: left,
+	}
+	p.next()
+	right, err := p.parseNode(powers.Get(bin.Op))
+	if err != nil {
+		return nil, err
+	}
+	bin.Right = right
+	return bin, nil
+}
+
+func (p *Parser) parseAssign(left ast.Node) (ast.Node, error) {
+	node := ast.AssignNode{
+		Ident: left,
+	}
+	op := p.curr.Type
+	p.next()
+	expr, err := p.parseNode(powAssign)
+	if err != nil {
+		return nil, err
+	}
+	switch op {
+	default:
+		return nil, p.unexpected()
+	case token.Assign:
+	case token.AddAssign:
+		op = token.Add
+	case token.SubAssign:
+		op = token.Sub
+	case token.MulAssign:
+		op = token.Mul
+	case token.DivAssign:
+		op = token.Div
+	case token.PowAssign:
+		op = token.Pow
+	case token.ModAssign:
+		op = token.Mod
+	case token.NullishAssign:
+		op = token.Nullish
+	case token.AndAssign:
+		op = token.And
+	case token.OrAssign:
+		op = token.Or
+	case token.LshiftAssign:
+		op = token.Lshift
+	case token.RshiftAssign:
+		op = token.Rshift
+	case token.BandAssign:
+		op = token.Band
+	case token.BorAssign:
+		op = token.Bor
+	case token.BxorAssign:
+		op = token.Bxor
+	}
+	if op != token.Assign {
+		expr = ast.BinaryNode{
+			Op:    op,
+			Left:  left,
+			Right: expr,
+		}
+	}
+	node.Expr = expr
+	return node, nil
+}
+
+func (p *Parser) parseTernary(left ast.Node) (ast.Node, error) {
+	p.next()
+	node := ast.IfNode{
+		Cdt: left,
+	}
+	csq, err := p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	node.Csq = csq
+	if err = p.expect(token.Colon); err != nil {
+		return nil, err
+	}
+	node.Alt, err = p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func (p *Parser) parseIndex(left ast.Node) (ast.Node, error) {
+	if err := p.expect(token.Lsquare); err != nil {
+		return nil, err
+	}
+	var (
+		node ast.IndexNode
+		err  error
+	)
+	node.Expr = left
+	node.Index, err = p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	return node, p.expect(token.Rsquare)
+}
+
+func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
+	call := ast.CallNode{
+		Ident: left,
+	}
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	for !p.done() && !p.is(token.Rparen) {
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		call.Args = append(call.Args, n)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+			if p.is(token.Rparen) {
+				return nil, p.unexpected()
+			}
+		case p.is(token.Rparen):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return call, p.expect(token.Rparen)
+}
+
+func (p *Parser) parseArrow(left ast.Node) (ast.Node, error) {
+	return nil, nil
+}
+
+func (p *Parser) parseMember(left ast.Node) (ast.Node, error) {
+	p.next()
+	node := ast.MemberNode{
+		Curr: left,
+	}
+	next, err := p.parseNode(powObject)
+	if err != nil {
+		return nil, err
+	}
+	node.Next = next
+	return node, nil
+}
+
+func (p *Parser) parseUnary() (ast.Node, error) {
+	node := ast.UnaryNode{
+		Op: p.curr.Type,
+	}
+	p.next()
+	expr, err := p.parseNode(powUnary)
+	if err != nil {
+		return nil, err
+	}
+	node.Expr = expr
+	return node, err
+}
+
+func (p *Parser) parseNumber() (ast.Node, error) {
+	defer p.next()
+	n, err := strconv.ParseFloat(p.curr.Literal, 64)
+	if err != nil {
+		return nil, err
+	}
+	return ast.CreateValue(n), nil
+}
+
+func (p *Parser) parseString() (ast.Node, error) {
+	defer p.next()
+	return ast.CreateValue(p.curr.Literal), nil
+}
+
+func (p *Parser) parseBool() (ast.Node, error) {
+	defer p.next()
+	n, err := strconv.ParseBool(p.curr.Literal)
+	if err != nil {
+		return nil, err
+	}
+	return ast.CreateValue(n), nil
+}
+
+func (p *Parser) parseIdentifier() (ast.Node, error) {
+	defer p.next()
+	node := ast.VarNode{
+		Ident: p.curr.Literal,
+	}
+	return node, nil
+}
+
+func (p *Parser) parseKeyword() (ast.Node, error) {
+	parse, ok := p.keywords[p.curr.Literal]
+	if !ok {
+		return nil, p.unexpected()
+	}
+	return parse()
+}
+
+func (p *Parser) parseTemplate() (ast.Node, error) {
+	if err := p.expect(token.Template); err != nil {
+		return nil, err
+	}
+	var node ast.TemplateNode
+	for !p.done() && !p.is(token.Template) {
+		if p.is(token.String) {
+			node.Nodes = append(node.Nodes, ast.CreateValue(p.curr.Literal))
+			p.next()
+			continue
+		}
+		if !p.is(token.BegSub) {
+			return nil, p.unexpected()
+		}
+		p.next()
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		node.Nodes = append(node.Nodes, n)
+		if err := p.expect(token.EndSub); err != nil {
+			return nil, err
+		}
+	}
+	return node, p.expect(token.Template)
+}
+
+func (p *Parser) parseObject() (ast.Node, error) {
+	if err := p.expect(token.Lbrace); err != nil {
+		return nil, err
+	}
+	list := make(map[string]ast.Node)
+	for !p.done() && !p.is(token.Rbrace) {
+		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
+			return nil, p.unexpected()
+		}
+		ident := p.curr.Literal
+		p.next()
+		if p.is(token.Comma) || p.is(token.Rbrace) {
+			list[ident] = ast.VarNode{
+				Ident: ident,
+			}
+			if p.is(token.Comma) {
+				p.next()
+			}
+			continue
+		}
+		if err := p.expect(token.Colon); err != nil {
+			return nil, err
+		}
+		node, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		list[ident] = node
+		switch {
+		case p.is(token.Comma):
+			p.next()
+		case p.is(token.Rbrace):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	node := ast.ObjectNode{
+		List: list,
+	}
+	return node, p.expect(token.Rbrace)
+}
+
+func (p *Parser) parseArray() (ast.Node, error) {
+	if err := p.expect(token.Lsquare); err != nil {
+		return nil, err
+	}
+	var arr ast.ArrayNode
+	for !p.done() && !p.is(token.Rsquare) {
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		arr.List = append(arr.List, n)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+		case p.is(token.Rsquare):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return arr, p.expect(token.Rsquare)
+}
+
+func (p *Parser) parseSpread() (ast.Node, error) {
+	p.next()
+	var (
+		node ast.SpreadNode
+		err  error
+	)
+	node.Node, err = p.parseNode(powLowest)
+	return node, err
+}
+
+func (p *Parser) parseBody() (ast.Node, error) {
+	if err := p.expect(token.Lbrace); err != nil {
+		return nil, err
+	}
+	p.skip(token.EOL)
+	var b ast.BlockNode
+	for !p.done() && !p.is(token.Rbrace) {
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		p.skip(token.EOL)
+		b.Nodes = append(b.Nodes, n)
+	}
+	if err := p.expect(token.Rbrace); err != nil {
+		return nil, err
+	}
+	if len(b.Nodes) == 1 {
+		return b.Nodes[0], nil
+	}
+	return b, nil
+}
+
+func (p *Parser) parseCondition() (ast.Node, error) {
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	expr, err := p.parseNode(powLowest)
+	if err != nil {
+		return nil, err
+	}
+	return expr, p.expect(token.Rparen)
+}
+
+func (p *Parser) registerPrefix(kind rune, fn prefixFunc) {
+	p.prefix[kind] = fn
+}
+
+func (p *Parser) registerInfix(kind rune, fn infixFunc) {
+	p.infix[kind] = fn
+}
+
+func (p *Parser) registerKeyword(kw string, fn prefixFunc) {
+	p.keywords[kw] = fn
+}
+
+func (p *Parser) skip(kind rune) {
+	for p.is(kind) {
+		p.next()
+	}
+}
+
+func (p *Parser) power() int {
+	return powers.Get(p.curr.Type)
+}
+
+func (p *Parser) expect(kind rune) error {
+	if p.is(kind) {
+		p.next()
+		return nil
+	}
+	return p.unexpected()
+}
+
+func (p *Parser) unexpected() error {
+	pos := p.curr.Position
+	return fmt.Errorf("(%d:%d) unexpected token %s", pos.Line, pos.Column, p.curr)
+}
+
+func (p *Parser) done() bool {
+	return p.is(token.EOF)
+}
+
+func (p *Parser) eol() bool {
+	return p.is(token.EOL)
+}
+
+func (p *Parser) is(kind rune) bool {
+	return p.curr.Type == kind
+}
+
+func (p *Parser) next() {
+	p.curr = p.peek
+	p.peek = p.scan.Scan()
+}
