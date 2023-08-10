@@ -204,7 +204,7 @@ func execBuiltinFunc(fn value.Builtin, args []value.Value) (value.Value, error) 
 }
 
 func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (value.Value, error) {
-	tmp := env.EnclosedEnv[value.Value](ev)
+	tmp := env.EnclosedEnv[value.Value](fn.Env)
 	for i, p := range fn.Params {
 		var (
 			arg value.Value
@@ -256,7 +256,6 @@ func evalArrow(n ast.ArrowNode, ev env.Environ[value.Value]) (value.Value, error
 	default:
 		return nil, ErrEval
 	}
-	fmt.Println(ev)
 	return fn, nil
 }
 
