@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+
+	"github.com/midbel/enjoy/env"
 )
 
 var (
@@ -20,6 +22,10 @@ type Value interface {
 	True() bool
 	Type() string
 	fmt.Stringer
+}
+
+type Evaluable interface {
+	Eval(env.Environ[Value]) (Value, error)
 }
 
 func IsNull(v Value) bool {

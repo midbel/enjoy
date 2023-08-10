@@ -3,6 +3,8 @@ package value
 import (
 	"fmt"
 	"strings"
+
+	"github.com/midbel/enjoy/env"
 )
 
 type Array struct {
@@ -74,50 +76,62 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 }
 
 func arrayMap(a Array, args []Value) (Value, error) {
-	// fn, ok := args[0].(Func)
-	// if !ok {
-	// 	return nil, ErrOperation
-	// }
-	// var (
-	// 	list  []Value
-	// 	ident string
-	// )
-	// if len(fn.params) > 0 {
-	// 	ident = fn.params[0].name
-	// }
-	// for i := range a.values {
-	// 	env := EnclosedEnv(fn.env)
-	// 	if ident != "" {
-	// 		env.Define(ident, a.values[i], false)
-	// 	}
-	// 	v, err := eval(fn.body, env)
-	// 	if err != nil && !errors.Is(err, ErrReturn) {
-	// 		return nil, err
-	// 	}
-	// 	list = append(list, v)
-	// }
-	// return CreateArray(list), nil
-	return undefined{}, nil
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var (
+		list  []Value
+		ident string
+		index string
+	)
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		if index != "" {
+			tmp.Define(index, CreateFloat(float64(i)), false)
+		}
+		v, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, v)
+	}
+	return CreateArray(list), nil
 }
 
 func arrayForEach(a Array, args []Value) (Value, error) {
-	// fn, ok := args[0].(Func)
-	// if !ok {
-	// 	return nil, ErrOperation
-	// }
-	// var ident string
-	// if len(fn.params) > 0 {
-	// 	ident = fn.params[0].name
-	// }
-	// for i := range a.values {
-	// 	env := env.EnclosedEnv(fn.env)
-	// 	if ident != "" {
-	// 		env.Define(ident, a.values[i], false)
-	// 	}
-	// 	_, err := eval(fn.body, env)
-	// 	if err != nil && !errors.Is(err, ErrReturn) {
-	// 		return nil, err
-	// 	}
-	// }
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var (
+		ident string
+		index string
+	)
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	if len(fn.Params) >= 2 {
+		index = fn.Params[1].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		if index != "" {
+			tmp.Define(index, CreateFloat(float64(i)), false)
+		}
+		_, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return null{}, nil
 }

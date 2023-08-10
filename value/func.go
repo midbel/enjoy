@@ -11,7 +11,7 @@ import (
 type Func struct {
 	Ident  string
 	Params []Parameter
-	Body   ast.Node
+	Body   Evaluable
 	Env    env.Environ[Value]
 }
 

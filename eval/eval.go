@@ -21,6 +21,24 @@ var (
 	ErrEval     = errors.New("node can not be evalualed in current context")
 )
 
+type evaluableNode struct {
+	ast.Node
+}
+
+func EvaluableNode(n ast.Node) value.Evaluable {
+	return evaluableNode {
+		Node: n,
+	}
+}
+
+func (e evaluableNode) Eval(ev env.Environ[value.Value]) (value.Value, error) {
+	v, err := eval(e.Node, ev)
+	if err == ErrReturn {
+		err = nil
+	}
+	return v, err
+}
+
 func EvalDefault(r io.Reader) (value.Value, error) {
 	return Eval(r, env.EnclosedEnv(value.Default()))
 }
@@ -93,6 +111,8 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return evalFunc(n, ev)
 	case ast.CallNode:
 		return evalCall(n, ev)
+	case evaluableNode:
+		return eval(n.Node, ev)
 	case ast.ReturnNode:
 		return evalReturn(n, ev)
 	default:
@@ -213,7 +233,7 @@ func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]
 func evalFunc(n ast.FuncNode, ev env.Environ[value.Value]) (value.Value, error) {
 	fn := value.Func{
 		Ident: n.Ident,
-		Body:  n.Body,
+		Body:  EvaluableNode(n.Body),
 		Env:   ev,
 	}
 	seq, ok := n.Args.(ast.SeqNode)
