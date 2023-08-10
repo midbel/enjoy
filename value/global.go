@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/midbel/enjoy/env"
@@ -36,15 +37,13 @@ func (g Global) RegisterFunc(ident string, fn ValueFunc[Global]) {
 }
 
 func (g Global) Get(prop string) (Value, error) {
-	v, ok := g.props[prop]
-	if ok {
+	if v, ok := g.props[prop]; ok {
 		return v, nil
 	}
-	_, ok = g.methods[prop]
-	if ok {
-		// return CreateString(prop), nil
+	if m, ok := g.methods[prop]; ok {
+		return globalFunctoValue(prop, g, m), nil
 	}
-	return undefined{}, nil
+	return Undefined(), nil
 }
 
 func (g Global) Call(fn string, args []Value) (Value, error) {
@@ -68,6 +67,13 @@ func (_ Global) Type() string {
 }
 
 type GlobalFunc ValueFunc[Global]
+
+func globalFunctoValue(name string, g Global, fn ValueFunc[Global]) Value {
+	call := func(args ...Value) (Value, error) {
+		return fn(g, args)
+	}
+	return CreateBuiltin(name, call)
+}
 
 type builtinMethodSet map[string]ValueFunc[Global]
 
@@ -211,6 +217,9 @@ func objectKeys(_ Global, args []Value) (Value, error) {
 	for k := range obj.values {
 		list = append(list, CreateString(k))
 	}
+	slices.SortFunc(list, func(s1, s2 Value) int {
+		return strings.Compare(s1.String(), s2.String())
+	})
 	return CreateArray(list), nil
 }
 

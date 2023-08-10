@@ -26,7 +26,7 @@ type evaluableNode struct {
 }
 
 func EvaluableNode(n ast.Node) value.Evaluable {
-	return evaluableNode {
+	return evaluableNode{
 		Node: n,
 	}
 }
