@@ -13,6 +13,7 @@ var (
 	ErrZero         = errors.New("division by zero")
 	ErrIndex        = errors.New("index out of range")
 	ErrArgument     = errors.New("wrong number of arguments given")
+	ErrImplemented  = errors.New("not yet implemented")
 )
 
 type Value interface {

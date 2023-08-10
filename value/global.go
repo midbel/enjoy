@@ -1,10 +1,12 @@
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/midbel/enjoy/env"
 )
@@ -74,6 +76,7 @@ func Default() env.Environ[Value] {
 	top.Define("console", Console(), true)
 	top.Define("Math", Math(), true)
 	top.Define("Object", Super(), true)
+	top.Define("JSON", Json(), true)
 
 	top.Define("parseInt", CreateBuiltin("parseInt", builtinParseInt), true)
 	top.Define("parseFloat", CreateBuiltin("parseFloat", builtinParseFloat), true)
@@ -94,6 +97,13 @@ func Console() Value {
 	obj := CreateGlobal("console")
 	obj.RegisterFunc("log", CheckArity(-1, consoleLog))
 	obj.RegisterFunc("error", CheckArity(-1, consoleErr))
+	return obj
+}
+
+func Json() Value {
+	obj := CreateGlobal("JSON")
+	obj.RegisterFunc("parse", CheckArity(1, jsonParse))
+	obj.RegisterFunc("stringify", CheckArity(1, jsonString))
 	return obj
 }
 
@@ -220,4 +230,53 @@ func objectSeal(_ Global, args []Value) (Value, error) {
 	}
 	obj.sealed = true
 	return obj, nil
+}
+
+func jsonParse(_ Global, args []Value) (Value, error) {
+	var (
+		r = strings.NewReader(args[0].String())
+		d interface{}
+	)
+	err := json.NewDecoder(r).Decode(&d)
+	if err != nil {
+		return nil, err
+	}
+	return jsonValues(d)
+}
+
+func jsonString(_ Global, args []Value) (Value, error) {
+	return nil, ErrImplemented
+}
+
+func jsonValues(d interface{}) (Value, error) {
+	switch v := d.(type) {
+	case string:
+		return CreateString(v), nil
+	case float64:
+		return CreateFloat(v), nil
+	case bool:
+		return CreateBool(v), nil
+	case []interface{}:
+		var list []Value
+		for i := range v {
+			d, err := jsonValues(v[i])
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, d)
+		}
+		return CreateArray(list), nil
+	case map[string]interface{}:
+		list := make(map[string]Value)
+		for k, v := range v {
+			a, err := jsonValues(v)
+			if err != nil {
+				return nil, err
+			}
+			list[k] = a
+		}
+		return CreateObject(list), nil
+	default:
+		return nil, fmt.Errorf("%T unsupported json type")
+	}
 }
