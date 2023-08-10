@@ -25,6 +25,7 @@ type powerSet map[rune]int
 
 var powers = powerSet{
 	token.Comma:         powComma,
+	token.Arrow:         powComma,
 	token.Dot:           powObject,
 	token.Optional:      powObject,
 	token.Lparen:        powCall,

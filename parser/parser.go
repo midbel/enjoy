@@ -628,7 +628,21 @@ func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
 }
 
 func (p *Parser) parseArrow(left ast.Node) (ast.Node, error) {
-	return nil, nil
+	var (
+		fn  ast.FuncNode
+		err error
+	)
+	fn.Args = left
+	p.next()
+	switch {
+	case p.is(token.Lparen):
+		fn.Body, err = p.parseGroup()
+	case p.is(token.Lbrace):
+		fn.Body, err = p.parseBody()
+	default:
+		fn.Body, err = p.parseNode(powLowest)
+	}
+	return fn, err
 }
 
 func (p *Parser) parseMember(left ast.Node) (ast.Node, error) {
