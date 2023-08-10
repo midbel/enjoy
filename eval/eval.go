@@ -109,6 +109,8 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return evalFor(n, ev)
 	case ast.FuncNode:
 		return evalFunc(n, ev)
+	case ast.ArrowNode:
+		return evalArrow(n, ev)
 	case ast.CallNode:
 		return evalCall(n, ev)
 	case evaluableNode:
@@ -228,6 +230,34 @@ func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]
 		err = nil
 	}
 	return res, err
+}
+
+func evalArrow(n ast.ArrowNode, ev env.Environ[value.Value]) (value.Value, error) {
+	fn := value.Func{
+		Body:  EvaluableNode(n.Body),
+		Env:   ev,
+	}
+	switch n := n.Args.(type) {
+	case ast.VarNode:
+		p := value.Parameter {
+			Name: n.Ident,
+		}
+		fn.Params = append(fn.Params, p)
+	case ast.SeqNode:
+		for _, a := range n.Nodes {
+			var p value.Parameter
+			g, ok := a.(ast.VarNode)
+			if !ok {
+				return nil, ErrEval
+			}
+			p.Name = g.Ident
+			fn.Params = append(fn.Params, p)
+		}
+	default:
+		return nil, ErrEval
+	}
+	fmt.Println(ev)
+	return fn, nil
 }
 
 func evalFunc(n ast.FuncNode, ev env.Environ[value.Value]) (value.Value, error) {

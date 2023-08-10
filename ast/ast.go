@@ -156,6 +156,11 @@ type FuncNode struct {
 	Body  Node
 }
 
+type ArrowNode struct {
+	Args  Node
+	Body  Node	
+}
+
 type ReturnNode struct {
 	Node
 }

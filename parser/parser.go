@@ -629,7 +629,7 @@ func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
 
 func (p *Parser) parseArrow(left ast.Node) (ast.Node, error) {
 	var (
-		fn  ast.FuncNode
+		fn ast.ArrowNode
 		err error
 	)
 	fn.Args = left
