@@ -102,7 +102,7 @@ func NewParser(r io.Reader) *Parser {
 	p.registerInfix(token.Arrow, p.parseArrow)
 	p.registerInfix(token.Dot, p.parseMember)
 	p.registerInfix(token.Optional, p.parseMember)
-	p.registerInfix(token.Comma, p.parseSequence)
+	// p.registerInfix(token.Comma, p.parseSequence)
 
 	p.registerKeyword("let", p.parseLet)
 	p.registerKeyword("const", p.parseConst)
@@ -176,28 +176,25 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 	if err := p.expect(token.Lparen); err != nil {
 		return nil, err
 	}
-	n, err := p.parseSequence(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	return n, p.expect(token.Rparen)
-}
-
-func (p *Parser) parseSequence(left ast.Node) (ast.Node, error) {
-	var list ast.SeqNode
-	list.Nodes = append(list.Nodes, left)
-	for p.is(token.Comma) {
-		p.next()
+	var seq ast.SeqNode
+	for !p.done() && !p.is(token.Rparen) {
 		n, err := p.parseNode(powComma)
 		if err != nil {
 			return nil, err
 		}
-		list.Nodes = append(list.Nodes, n)
+		seq.Nodes = append(seq.Nodes, n)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+			if p.is(token.Rparen) {
+				return nil, p.unexpected()
+			}
+		case p.is(token.Rparen):
+		default:
+			return nil, p.unexpected()
+		}
 	}
-	if len(list.Nodes) == 1 {
-		return list.Nodes[0], nil
-	}
-	return list, nil
+	return seq, p.expect(token.Rparen)
 }
 
 func (p *Parser) parseLet() (ast.Node, error) {
@@ -497,49 +494,11 @@ func (p *Parser) parseFunction() (ast.Node, error) {
 		fn.Ident = p.curr.Literal
 		p.next()
 	}
-	if fn.Args, err = p.parseArgs(); err != nil {
+	if fn.Args, err = p.parseGroup(); err != nil {
 		return nil, err
 	}
 	fn.Body, err = p.parseBody()
 	return fn, err
-}
-
-func (p *Parser) parseArgs() ([]ast.Node, error) {
-	if err := p.expect(token.Lparen); err != nil {
-		return nil, err
-	}
-	var (
-		args []ast.Node
-		err  error
-	)
-	for !p.done() && !p.is(token.Rparen) {
-		if !p.is(token.Ident) {
-			return nil, p.unexpected()
-		}
-		a := ast.ArgNode{
-			Ident: p.curr.Literal,
-		}
-		p.next()
-		if p.is(token.Assign) {
-			p.next()
-			a.Value, err = p.parseNode(powLowest)
-			if err != nil {
-				return nil, err
-			}
-		}
-		args = append(args, a)
-		switch {
-		case p.is(token.Comma):
-			p.next()
-			if p.is(token.Rparen) {
-				return nil, p.unexpected()
-			}
-		case p.is(token.Rparen):
-		default:
-			return nil, p.unexpected()
-		}
-	}
-	return args, p.expect(token.Rparen)
 }
 
 func (p *Parser) parseReturn() (ast.Node, error) {
@@ -660,27 +619,12 @@ func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
 	call := ast.CallNode{
 		Ident: left,
 	}
-	if err := p.expect(token.Lparen); err != nil {
+	args, err := p.parseGroup()
+	if err != nil {
 		return nil, err
 	}
-	for !p.done() && !p.is(token.Rparen) {
-		n, err := p.parseNode(powComma)
-		if err != nil {
-			return nil, err
-		}
-		call.Args = append(call.Args, n)
-		switch {
-		case p.is(token.Comma):
-			p.next()
-			if p.is(token.Rparen) {
-				return nil, p.unexpected()
-			}
-		case p.is(token.Rparen):
-		default:
-			return nil, p.unexpected()
-		}
-	}
-	return call, p.expect(token.Rparen)
+	call.Args = args
+	return call, nil
 }
 
 func (p *Parser) parseArrow(left ast.Node) (ast.Node, error) {

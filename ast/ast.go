@@ -150,14 +150,9 @@ type ForOfNode struct {
 	Body  Node
 }
 
-type ArgNode struct {
-	Ident string
-	Value Node
-}
-
 type FuncNode struct {
 	Ident string
-	Args  []Node
+	Args  Node
 	Body  Node
 }
 
@@ -167,7 +162,7 @@ type ReturnNode struct {
 
 type CallNode struct {
 	Ident Node
-	Args  []Node
+	Args  Node
 }
 
 type TypeofNode struct {

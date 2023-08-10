@@ -118,7 +118,7 @@ func evalCall(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, error) 
 	}
 }
 
-func callMember(n ast.MemberNode, args []ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
+func callMember(n ast.MemberNode, args ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 	v, err := eval(n.Curr, ev)
 	if err != nil {
 		return nil, err
@@ -131,13 +131,9 @@ func callMember(n ast.MemberNode, args []ast.Node, ev env.Environ[value.Value]) 
 	if !ok {
 		return nil, value.ErrOperation
 	}
-	var values []value.Value
-	for _, a := range args {
-		g, err := eval(a, ev)
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, g)
+	values, err := seqValues(args, ev)
+	if err != nil {
+		return nil, err
 	}
 	v, err = call.Call(id.Ident, values)
 	if err != nil {
@@ -151,22 +147,34 @@ func callDefault(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, erro
 	if err != nil {
 		return nil, err
 	}
+	values, err := seqValues(n.Args, ev)
+	if err != nil {
+		return nil, err
+	}
+	switch call := call.(type) {
+	case value.Func:
+		return execUserFunc(call, values, ev)
+	case value.Builtin:
+		return execBuiltinFunc(call, values)
+	default:
+		return nil, ErrEval
+	}
+}
+
+func seqValues(n ast.Node, ev env.Environ[value.Value]) ([]value.Value, error) {
+	seq, ok := n.(ast.SeqNode)
+	if !ok {
+		return nil, ErrEval
+	}
 	var args []value.Value
-	for _, a := range n.Args {
+	for _, a := range seq.Nodes {
 		g, err := eval(a, ev)
 		if err != nil {
 			return nil, err
 		}
 		args = append(args, g)
 	}
-	switch call := call.(type) {
-	case value.Func:
-		return execUserFunc(call, args, ev)
-	case value.Builtin:
-		return execBuiltinFunc(call, args)
-	default:
-		return nil, ErrEval
-	}
+	return args, nil
 }
 
 func execBuiltinFunc(fn value.Builtin, args []value.Value) (value.Value, error) {
@@ -208,14 +216,24 @@ func evalFunc(n ast.FuncNode, ev env.Environ[value.Value]) (value.Value, error) 
 		Body:  n.Body,
 		Env:   ev,
 	}
-	for _, a := range n.Args {
-		g, ok := a.(ast.ArgNode)
-		if !ok {
+	seq, ok := n.Args.(ast.SeqNode)
+	if !ok {
+		return nil, ErrEval
+	}
+	for _, a := range seq.Nodes {
+		var p value.Parameter
+		switch g := a.(type) {
+		case ast.AssignNode:
+			i, ok := g.Ident.(ast.VarNode)
+			if !ok {
+				return nil, ErrEval
+			}
+			p.Name = i.Ident
+			p.Value = g.Expr
+		case ast.VarNode:
+			p.Name = g.Ident
+		default:
 			return nil, ErrEval
-		}
-		p := value.Parameter{
-			Name:  g.Ident,
-			Value: g.Value,
 		}
 		fn.Params = append(fn.Params, p)
 	}

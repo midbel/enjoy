@@ -87,7 +87,7 @@ func Super() Value {
 	obj.RegisterFunc("freeze", objectFreeze)
 	obj.RegisterFunc("seal", objectSeal)
 	obj.RegisterFunc("keys", objectKeys)
-	return obj	
+	return obj
 }
 
 func Console() Value {
@@ -221,4 +221,3 @@ func objectSeal(_ Global, args []Value) (Value, error) {
 	obj.sealed = true
 	return obj, nil
 }
-
