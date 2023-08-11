@@ -234,12 +234,12 @@ func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]
 
 func evalArrow(n ast.ArrowNode, ev env.Environ[value.Value]) (value.Value, error) {
 	fn := value.Func{
-		Body:  EvaluableNode(n.Body),
-		Env:   ev,
+		Body: EvaluableNode(n.Body),
+		Env:  ev,
 	}
 	switch n := n.Args.(type) {
 	case ast.VarNode:
-		p := value.Parameter {
+		p := value.Parameter{
 			Name: n.Ident,
 		}
 		fn.Params = append(fn.Params, p)

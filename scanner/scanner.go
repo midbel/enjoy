@@ -108,7 +108,21 @@ func (s *Scanner) scanDefault() token.Token {
 	if token.CanSkipBlanks(tok.Type) {
 		s.skip(isBlank)
 	}
+	s.discardNL()
 	return tok
+}
+
+func (s *Scanner) discardNL() {
+	if !isNL(s.char) {
+		return
+	}
+	s.save()
+	s.skip(isBlank)
+	switch s.char {
+	case rparen, rbrace, rsquare:
+	default:
+		s.restore()
+	}
 }
 
 func (s *Scanner) toggleSubstitution() token.Token {
