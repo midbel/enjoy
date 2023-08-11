@@ -741,7 +741,6 @@ func (p *Parser) parseObject() (ast.Node, error) {
 	if err := p.expect(token.Lbrace); err != nil {
 		return nil, err
 	}
-	p.skip(token.EOL)
 	list := make(map[string]ast.Node)
 	for !p.done() && !p.is(token.Rbrace) {
 		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
@@ -769,7 +768,6 @@ func (p *Parser) parseObject() (ast.Node, error) {
 		switch {
 		case p.is(token.Comma):
 			p.next()
-			p.skip(token.EOL)
 		case p.is(token.Rbrace):
 		default:
 			return nil, p.unexpected()

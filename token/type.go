@@ -69,3 +69,15 @@ const (
 	Spread
 	Invalid
 )
+
+func CanSkipBlanks(k rune) bool {
+	switch k {
+	default:
+		return false
+	case Lparen:
+	case Lsquare:
+	case Lbrace:
+	case Comma:
+	}
+	return true
+}

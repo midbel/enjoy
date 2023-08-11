@@ -48,7 +48,6 @@ func (s *Scanner) prepare() token.Token {
 	var tok token.Token
 	tok.Offset = s.curr
 	tok.Position = s.cursor.Position
-	tok.Position.Column--
 	return tok
 }
 
@@ -105,6 +104,9 @@ func (s *Scanner) scanDefault() token.Token {
 		s.toggleTemplate(&tok)
 	default:
 		s.scanPunct(&tok)
+	}
+	if token.CanSkipBlanks(tok.Type) {
+		s.skip(isBlank)
 	}
 	return tok
 }
