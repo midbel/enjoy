@@ -73,25 +73,3 @@ func (b Builtin) Apply(args []Value) (Value, error) {
 	}
 	return v, err
 }
-
-func builtinParseInt(args ...Value) (Value, error) {
-	if len(args) != 1 {
-		return nil, ErrArgument
-	}
-	return Coerce(args[0])
-}
-
-func builtinParseFloat(args ...Value) (Value, error) {
-	if len(args) != 1 {
-		return nil, ErrArgument
-	}
-	return Coerce(args[0])
-}
-
-func builtinPrint(args ...Value) (Value, error) {
-	if len(args) != 1 {
-		return nil, ErrArgument
-	}
-	fmt.Println(args[0])
-	return nil, nil
-}

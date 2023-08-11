@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/midbel/enjoy/ast"
+	"github.com/midbel/enjoy/builtins"
 	"github.com/midbel/enjoy/env"
 	"github.com/midbel/enjoy/parser"
 	"github.com/midbel/enjoy/token"
@@ -20,6 +21,20 @@ var (
 	ErrThrow    = errors.New("throw")
 	ErrEval     = errors.New("node can not be evalualed in current context")
 )
+
+func Default() env.Environ[value.Value] {
+	top := env.EmptyEnv[value.Value]()
+	top.Define("console", builtins.Console(), true)
+	top.Define("Math", builtins.Math(), true)
+	top.Define("Object", builtins.Object(), true)
+	top.Define("JSON", builtins.Json(), true)
+
+	top.Define("parseInt", builtins.ParseInt(), true)
+	top.Define("parseFloat", builtins.ParseFloat(), true)
+	top.Define("print", builtins.Print(), true)
+
+	return env.Immutable(top)
+}
 
 type evaluableNode struct {
 	ast.Node
@@ -40,7 +55,7 @@ func (e evaluableNode) Eval(ev env.Environ[value.Value]) (value.Value, error) {
 }
 
 func EvalDefault(r io.Reader) (value.Value, error) {
-	return Eval(r, env.EnclosedEnv(value.Default()))
+	return Eval(r, env.EnclosedEnv(Default()))
 }
 
 func Eval(r io.Reader, ev env.Environ[value.Value]) (value.Value, error) {

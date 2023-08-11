@@ -16,6 +16,10 @@ func CreateFloat(f float64) Value {
 	}
 }
 
+func (f Float) Native() float64 {
+	return f.value
+}
+
 func (f Float) True() bool {
 	return f.value != 0
 }

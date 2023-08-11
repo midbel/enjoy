@@ -1,6 +1,7 @@
 package value
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -14,6 +15,25 @@ func CreateObject(list map[string]Value) Value {
 	return Object{
 		values: list,
 	}
+}
+
+func (o Object) Keys() Value {
+	var list []Value
+	for k := range o.values {
+		list = append(list, CreateString(k))
+	}
+	slices.SortFunc(list, func(s1, s2 Value) int {
+		return strings.Compare(s1.String(), s2.String())
+	})
+	return CreateArray(list)
+}
+
+func (o *Object) Freeze() {
+	o.frozen = true
+}
+
+func (o *Object) Seal() {
+	o.sealed = true
 }
 
 func (o Object) At(ix Value) (Value, error) {
