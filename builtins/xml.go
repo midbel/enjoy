@@ -8,12 +8,12 @@ import (
 )
 
 func Xml() value.Value {
-	obj := value.CreateObject("Xml")
+	obj := value.CreateGlobal("XML")
 	obj.RegisterFunc("parse", xmlParse)
 	return obj
 }
 
-func xmlParse(_ value.Global, args []value.Value) (Value, error) {
+func xmlParse(_ value.Global, args []value.Value) (value.Value, error) {
 	rs := sax.New(strings.NewReader(args[0].String()), nil)
 	_ = rs
 	return nil, nil
