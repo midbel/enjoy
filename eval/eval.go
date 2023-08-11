@@ -28,6 +28,7 @@ func Default() env.Environ[value.Value] {
 	top.Define("Math", builtins.Math(), true)
 	top.Define("Object", builtins.Object(), true)
 	top.Define("JSON", builtins.Json(), true)
+	top.Define("XML", builtins.Xml(), true)
 
 	top.Define("parseInt", builtins.ParseInt(), true)
 	top.Define("parseFloat", builtins.ParseFloat(), true)
