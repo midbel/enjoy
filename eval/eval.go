@@ -87,6 +87,8 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return evalObject(n, ev)
 	case ast.ArrayNode:
 		return evalArray(n, ev)
+	case ast.SpreadNode:
+		return evalSpread(n, ev)
 	case ast.TypeofNode:
 		return evalTypeOf(n, ev)
 	case ast.IndexNode:
@@ -226,7 +228,8 @@ func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value])
 		arg value.Value
 		err error
 	)
-	for i, p := range fn.Params {
+	for i := 0; i < len(fn.Params); i++ {
+		p := fn.Params[i]
 		if i >= len(args) {
 			arg = value.Undefined()
 			if p.Value != nil {
@@ -241,6 +244,18 @@ func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value])
 			continue
 		}
 		arg = args[i]
+		if s, ok := arg.(value.Spread); ok {
+			for _, a := range s.Spread() {
+				if i >= len(fn.Params) {
+					break
+				}
+				if err := tmp.Define(fn.Params[i].Name, a, false); err != nil {
+					return nil, err
+				}
+				i++
+			}
+			continue
+		}
 		if obj, ok := arg.(value.Object); ok && p.Name == "" {
 			n, ok := p.Value.(ast.ObjectNode)
 			if !ok {
@@ -719,24 +734,24 @@ func evalTypeOf(n ast.TypeofNode, ev env.Environ[value.Value]) (value.Value, err
 	return nil, nil
 }
 
+func evalSpread(n ast.SpreadNode, ev env.Environ[value.Value]) (value.Value, error) {
+	v, err := eval(n.Node, ev)
+	if err != nil {
+		return nil, err
+	}
+	return value.SpreadValue(v)
+}
+
 func evalArray(n ast.ArrayNode, ev env.Environ[value.Value]) (value.Value, error) {
 	var list []value.Value
 	for _, a := range n.List {
-		if s, ok := a.(ast.SpreadNode); ok {
-			v, err := eval(s.Node, ev)
-			if err != nil {
-				return nil, err
-			}
-			i, ok := v.(value.Spreadable)
-			if !ok {
-				return nil, ErrEval
-			}
-			list = append(list, i.Spread()...)
+		v, err := eval(a, ev)
+		if err != nil {
+			return nil, err
+		}
+		if s, ok := v.(value.Spread); ok {
+			list = append(list, s.Spread()...)
 		} else {
-			v, err := eval(a, ev)
-			if err != nil {
-				return nil, err
-			}
 			list = append(list, v)
 		}
 	}

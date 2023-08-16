@@ -156,3 +156,28 @@ func Decrement(v Value) (Value, error) {
 	}
 	return f.Decr(), nil
 }
+
+type Spread struct {
+	Value
+}
+
+func SpreadValue(v Value) (Value, error) {
+	if _, ok := v.(Spreadable); !ok {
+		return nil, ErrOperation
+	}
+	s := Spread{
+		Value: v,
+	}
+	return s, nil
+}
+
+func (s Spread) Spread() []Value {
+	switch s := s.Value.(type) {
+	case Array:
+		return s.Spread()
+	case Str:
+		return s.Spread()
+	default:
+		return nil
+	}
+}
