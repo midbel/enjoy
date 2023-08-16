@@ -2,6 +2,7 @@ package value
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/midbel/enjoy/env"
@@ -19,6 +20,10 @@ func CreateArray(vs []Value) Value {
 
 func (a Array) True() bool {
 	return a.Len() > 0
+}
+
+func (a Array) Spread() []Value {
+	return slices.Clone(a.values)
 }
 
 func (a Array) Len() int {
@@ -66,7 +71,7 @@ func (a Array) String() string {
 	return str.String()
 }
 
-func (b Array) Type() string {
+func (_ Array) Type() string {
 	return "array"
 }
 

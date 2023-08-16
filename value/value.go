@@ -28,6 +28,14 @@ type Evaluable interface {
 	Eval(env.Environ[Value]) (Value, error)
 }
 
+type Spreadable interface {
+	Spread() []Value
+}
+
+type Enumerable interface {
+	Enumerate() []Value
+}
+
 func IsNull(v Value) bool {
 	_, ok := v.(null)
 	return ok || v == nil

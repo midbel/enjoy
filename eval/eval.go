@@ -629,7 +629,7 @@ func setArray(a ast.ArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool)
 			if !ok {
 				return nil, ErrEval
 			}
-			if value.IsUndefined(val) {
+			if value.IsUndefined(val) || value.IsNull(val) {
 				val, err = eval(n.Expr, ev)
 			}
 			if err == nil {
@@ -722,11 +722,23 @@ func evalTypeOf(n ast.TypeofNode, ev env.Environ[value.Value]) (value.Value, err
 func evalArray(n ast.ArrayNode, ev env.Environ[value.Value]) (value.Value, error) {
 	var list []value.Value
 	for _, a := range n.List {
-		v, err := eval(a, ev)
-		if err != nil {
-			return nil, err
+		if s, ok := a.(ast.SpreadNode); ok {
+			v, err := eval(s.Node, ev)
+			if err != nil {
+				return nil, err
+			}
+			i, ok := v.(value.Spreadable)
+			if !ok {
+				return nil, ErrEval
+			}
+			list = append(list, i.Spread()...)
+		} else {
+			v, err := eval(a, ev)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, v)
 		}
-		list = append(list, v)
 	}
 	return value.CreateArray(list), nil
 }

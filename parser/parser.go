@@ -807,7 +807,7 @@ func (p *Parser) parseSpread() (ast.Node, error) {
 		node ast.SpreadNode
 		err  error
 	)
-	node.Node, err = p.parseNode(powLowest)
+	node.Node, err = p.parseNode(powAssign)
 	return node, err
 }
 

@@ -19,6 +19,18 @@ func (s Str) True() bool {
 	return s.value != ""
 }
 
+func (s Str) Spread() []Value {
+	var list []Value
+	for _, c := range strings.Split(s.value, "") {
+		list = append(list, CreateString(c))
+	}
+	return list
+}
+
+func (s Str) Len() int {
+	return len(s.value)
+}
+
 func (s Str) At(ix Value) (Value, error) {
 	x, ok := ix.(Float)
 	if !ok {
