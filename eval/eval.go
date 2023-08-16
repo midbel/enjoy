@@ -616,16 +616,32 @@ func setArray(a ast.ArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool)
 		return nil, err
 	}
 	arr, ok := res.(value.Array)
-	if !ok || arr.Len() != len(a.List) {
+	if !ok {
 		return nil, ErrEval
 	}
-	for x, n := range a.List {
-		i, ok := n.(ast.VarNode)
-		if !ok {
-			return nil, ErrEval
+	for i, n := range a.List {
+		val, _ := arr.At(value.CreateFloat(float64(i)))
+		switch n := n.(type) {
+		case ast.VarNode:
+			err = ev.Define(n.Ident, val, ro)
+		case ast.AssignNode:
+			id, ok := n.Ident.(ast.VarNode)
+			if !ok {
+				return nil, ErrEval
+			}
+			if value.IsUndefined(val) {
+				val, err = eval(n.Expr, ev)
+			}
+			if err == nil {
+				err = ev.Define(id.Ident, val, ro)
+			}
+		case ast.SpreadNode:
+		default:
+			err = ErrEval
 		}
-		v, _ := arr.At(value.CreateFloat(float64(x)))
-		ev.Define(i.Ident, v, ro)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return res, nil
 }
