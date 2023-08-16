@@ -31,7 +31,7 @@ func xmlParse(_ value.Global, args []value.Value) (value.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nativeToValues(d)	
+	return nativeToValues(d)
 }
 
 func jsonParse(_ value.Global, args []value.Value) (value.Value, error) {

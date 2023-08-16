@@ -152,6 +152,7 @@ func evalCall(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, error) 
 	case ast.MemberNode:
 		return callMember(m, n.Args, ev)
 	default:
+		fmt.Println("call")
 		return callDefault(n, ev)
 	}
 }
@@ -219,27 +220,54 @@ func execBuiltinFunc(fn value.Builtin, args []value.Value) (value.Value, error) 
 	return fn.Apply(args)
 }
 
-func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (value.Value, error) {
-	tmp := env.EnclosedEnv[value.Value](fn.Env)
+func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (env.Environ[value.Value], error) {
+	var (
+		tmp = env.EnclosedEnv[value.Value](fn.Env)
+		arg value.Value
+		err error
+	)
 	for i, p := range fn.Params {
-		var (
-			arg value.Value
-			err error
-		)
 		if i >= len(args) {
-			arg = value.Null()
+			arg = value.Undefined()
 			if p.Value != nil {
 				arg, err = eval(p.Value, ev)
 			}
-		} else {
-			arg = args[i]
+			if err != nil {
+				return nil, err
+			}
+			if err = tmp.Define(p.Name, arg, false); err != nil {
+				return nil, err
+			}
+			continue
 		}
-		if err != nil {
+		arg = args[i]
+		if obj, ok := arg.(value.Object); ok && p.Name == "" {
+			n, ok := p.Value.(ast.ObjectNode)
+			if !ok {
+				return nil, ErrEval
+			}
+			for k := range n.List {
+				arg, _ = obj.Get(k)
+				if err := tmp.Define(k, arg, false); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
+		if p.Name == "" {
+			return nil, ErrEval
+		}
+		if err = tmp.Define(p.Name, arg, false); err != nil {
 			return nil, err
 		}
-		if err := tmp.Define(p.Name, arg, false); err != nil {
-			return nil, err
-		}
+	}
+	return tmp, nil
+}
+
+func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (value.Value, error) {
+	tmp, err := prepareArgs(fn, args, ev)
+	if err != nil {
+		return nil, err
 	}
 	res, err := eval(fn.Body, tmp)
 	if errors.Is(err, ErrReturn) {
@@ -297,6 +325,8 @@ func evalFunc(n ast.FuncNode, ev env.Environ[value.Value]) (value.Value, error) 
 			p.Value = g.Expr
 		case ast.VarNode:
 			p.Name = g.Ident
+		case ast.ObjectNode:
+			p.Value = a
 		default:
 			return nil, ErrEval
 		}
