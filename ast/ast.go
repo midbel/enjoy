@@ -30,6 +30,8 @@ type VarNode struct {
 	Ident string
 }
 
+type DiscardNode struct{}
+
 type TemplateNode struct {
 	Nodes []Node
 }
@@ -72,6 +74,14 @@ type ConstNode struct {
 type AssignNode struct {
 	Ident Node
 	Expr  Node
+}
+
+type BindingArrayNode struct {
+	List []Node
+}
+
+type BindingObjectNode struct {
+	List map[string]Node
 }
 
 type UnaryNode struct {

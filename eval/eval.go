@@ -154,7 +154,6 @@ func evalCall(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, error) 
 	case ast.MemberNode:
 		return callMember(m, n.Args, ev)
 	default:
-		fmt.Println("call")
 		return callDefault(n, ev)
 	}
 }
@@ -560,10 +559,10 @@ func evalConst(n ast.ConstNode, ev env.Environ[value.Value]) (value.Value, error
 	switch x := n.Ident.(type) {
 	case ast.VarNode:
 		return setVar(x, n.Expr, ev, true)
-	case ast.ArrayNode:
-		return setArray(x, n.Expr, ev, true)
-	case ast.ObjectNode:
-		return setObject(x, n.Expr, ev, true)
+	case ast.BindingArrayNode:
+		return evalBindArray(x, n.Expr, ev, true)
+	case ast.BindingObjectNode:
+		return evalBindObject(x, n.Expr, ev, true)
 	default:
 		return nil, ErrEval
 	}
@@ -573,16 +572,16 @@ func evalLet(n ast.LetNode, ev env.Environ[value.Value]) (value.Value, error) {
 	switch x := n.Ident.(type) {
 	case ast.VarNode:
 		return setVar(x, n.Expr, ev, false)
-	case ast.ArrayNode:
-		return setArray(x, n.Expr, ev, false)
-	case ast.ObjectNode:
-		return setObject(x, n.Expr, ev, false)
+	case ast.BindingArrayNode:
+		return evalBindArray(x, n.Expr, ev, false)
+	case ast.BindingObjectNode:
+		return evalBindObject(x, n.Expr, ev, false)
 	default:
 		return nil, ErrEval
 	}
 }
 
-func setObject(o ast.ObjectNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
+func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
 	if ro && n == nil {
 		return nil, ErrEval
 	}
@@ -616,7 +615,7 @@ func setObject(o ast.ObjectNode, n ast.Node, ev env.Environ[value.Value], ro boo
 	return res, nil
 }
 
-func setArray(a ast.ArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
+func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
 	if ro && n == nil {
 		return nil, ErrEval
 	}
@@ -637,6 +636,7 @@ func setArray(a ast.ArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool)
 	for i, n := range a.List {
 		val, _ := arr.At(value.CreateFloat(float64(i)))
 		switch n := n.(type) {
+		case ast.DiscardNode:
 		case ast.VarNode:
 			err = ev.Define(n.Ident, val, ro)
 		case ast.AssignNode:
@@ -651,6 +651,16 @@ func setArray(a ast.ArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool)
 				err = ev.Define(id.Ident, val, ro)
 			}
 		case ast.SpreadNode:
+			id, ok := n.Node.(ast.VarNode)
+			if !ok {
+				return nil, ErrEval
+			}
+			var vs []value.Value
+			for j := i; j < arr.Len(); j++ {
+				v, _ := arr.At(value.CreateFloat(float64(j)))
+				vs = append(vs, v)
+			}
+			err = ev.Define(id.Ident, value.CreateArray(vs), ro)
 		default:
 			err = ErrEval
 		}

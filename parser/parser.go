@@ -199,14 +199,25 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 
 func (p *Parser) parseLet() (ast.Node, error) {
 	p.next()
-	ident, err := p.parseNode(powUnary)
+	var (
+		left ast.Node
+		err  error
+	)
+	switch {
+	case p.is(token.Lbrace):
+		left, err = p.parseObjectBinding()
+	case p.is(token.Lsquare):
+		left, err = p.parseArrayBinding()
+	default:
+		left, err = p.parseNode(powUnary)
+	}
 	if err != nil {
 		return nil, err
 	}
 	node := ast.LetNode{
-		Ident: ident,
+		Ident: left,
 	}
-	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
+	if _, ok := left.(ast.VarNode); p.is(token.EOL) {
 		if !ok {
 			return nil, p.unexpected()
 		}
@@ -241,6 +252,47 @@ func (p *Parser) parseConst() (ast.Node, error) {
 	}
 	node.Expr = expr
 	return node, nil
+}
+
+func (p *Parser) parseObjectBinding() (ast.Node, error) {
+	if err := p.expect(token.Lbrace); err != nil {
+		return nil, err
+	}
+	var node ast.BindingObjectNode
+	for !p.done() && !p.is(token.Rbrace) {
+
+	}
+	return node, p.expect(token.Rbrace)
+}
+
+func (p *Parser) parseArrayBinding() (ast.Node, error) {
+	if err := p.expect(token.Lsquare); err != nil {
+		return nil, err
+	}
+	var arr ast.BindingArrayNode
+	for !p.done() && !p.is(token.Rsquare) {
+		if p.is(token.Comma) {
+			p.next()
+			arr.List = append(arr.List, ast.DiscardNode{})
+			continue
+		}
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		arr.List = append(arr.List, n)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+			if _, ok := n.(ast.SpreadNode); ok && p.is(token.Rsquare) {
+				return nil, p.unexpected()
+			}
+		case p.is(token.Rsquare):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return arr, p.expect(token.Rsquare)
 }
 
 func (p *Parser) parseNull() (ast.Node, error) {
