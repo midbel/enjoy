@@ -741,7 +741,11 @@ func evalMember(n ast.MemberNode, ev env.Environ[value.Value]) (value.Value, err
 }
 
 func evalTypeOf(n ast.TypeofNode, ev env.Environ[value.Value]) (value.Value, error) {
-	return nil, nil
+	v, err := eval(n.Node, ev)
+	if err == nil {
+		v = value.CreateString(v.Type())
+	}
+	return v, err
 }
 
 func evalSpread(n ast.SpreadNode, ev env.Environ[value.Value]) (value.Value, error) {

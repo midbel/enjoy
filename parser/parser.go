@@ -668,6 +668,9 @@ func (p *Parser) parseIndex(left ast.Node) (ast.Node, error) {
 }
 
 func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
+	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
+	defer p.registerPrefix(token.Lbrace, p.parseObject)
+
 	call := ast.CallNode{
 		Ident: left,
 	}
