@@ -102,6 +102,7 @@ func NewParser(r io.Reader) *Parser {
 	p.registerInfix(token.Arrow, p.parseArrow)
 	p.registerInfix(token.Dot, p.parseMember)
 	p.registerInfix(token.Optional, p.parseMember)
+	p.registerInfix(token.Keyword, p.parseOperatorKeyword)
 	// p.registerInfix(token.Comma, p.parseSequence)
 
 	p.registerKeyword("let", p.parseLet)
@@ -303,6 +304,27 @@ func (p *Parser) parseNull() (ast.Node, error) {
 func (p *Parser) parseUndefined() (ast.Node, error) {
 	defer p.next()
 	return ast.UndefinedNode{}, nil
+}
+
+func (p *Parser) parseOperatorKeyword(left ast.Node) (ast.Node, error) {
+	switch p.curr.Literal {
+	case "in":
+		return p.parseIn(left)
+	case "instanceof":
+		return p.parseInstanceOf(left)
+	default:
+		return nil, p.unexpected()
+	}
+}
+
+func (p *Parser) parseIn(left ast.Node) (ast.Node, error) {
+	p.next()
+	return left, nil
+}
+
+func (p *Parser) parseInstanceOf(left ast.Node) (ast.Node, error) {
+	p.next()
+	return left, nil
 }
 
 func (p *Parser) parseTypeOf() (ast.Node, error) {

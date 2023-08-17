@@ -183,3 +183,13 @@ type CallNode struct {
 type TypeofNode struct {
 	Node
 }
+
+type InNode struct {
+	Left  Node
+	Right Node
+}
+
+type InstanceOf struct {
+	Left  Node
+	Right Node
+}
