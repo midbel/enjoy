@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+type Descriptor struct {
+	Value
+	Writable     bool
+	Configurable bool
+	Enumerable   bool
+}
+
 type Object struct {
 	frozen bool
 	sealed bool
