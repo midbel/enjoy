@@ -596,10 +596,15 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 			return nil, err
 		}
 	}
-	obj, ok := res.(value.Object)
+	return res, bindObject(o, res, ev, ro)
+}
+
+func bindObject(o ast.BindingObjectNode, v value.Value, ev env.Environ[value.Value], ro bool) error {
+	obj, ok := v.(value.Object)
 	if !ok {
-		return nil, ErrEval
+		return nil
 	}
+	var err error
 	for k, n := range o.List {
 		v, _ := obj.Get(k)
 		if v == nil {
@@ -607,35 +612,27 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 		}
 		a, ok := n.(ast.AssignNode)
 		if !ok {
-			return nil, ErrEval
+			return ErrEval
 		}
 		switch i := a.Ident.(type) {
 		case ast.VarNode:
 			if value.IsUndefined(v) && a.Expr != nil {
 				v, err = eval(a.Expr, ev)
 				if err != nil {
-					return nil, err
+					break
 				}
 			}
-			if err := ev.Define(i.Ident, v, ro); err != nil {
-				return nil, err
-			}
+			err = ev.Define(i.Ident, v, ro)
 		case ast.BindingObjectNode:
-			ev.Define(k, v, false)
-			x := ast.VarNode{
-				Ident: k,
-			}
-			if _, err = evalBindObject(i, x, ev, ro); err != nil {
-				return nil, err
-			}
-			if d, ok := ev.(interface{ Delete(string) }); ok {
-				d.Delete(k)
-			}
+			err = bindObject(i, v, ev, ro)
 		default:
-			return nil, ErrEval
+			return ErrEval
+		}
+		if err != nil {
+			break
 		}
 	}
-	return res, nil
+	return err
 }
 
 func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
@@ -643,9 +640,8 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 		return nil, ErrEval
 	}
 	var (
-		nodes = slices.Clone(a.List)
-		res   = value.Undefined()
-		err   error
+		res = value.Undefined()
+		err error
 	)
 	if n != nil {
 		res, err = eval(n, ev)
@@ -653,10 +649,18 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 			return nil, err
 		}
 	}
-	arr, ok := res.(value.Array)
+	return res, bindArray(a, res, ev, ro)
+}
+
+func bindArray(a ast.BindingArrayNode, v value.Value, ev env.Environ[value.Value], ro bool) error {
+	arr, ok := v.(value.Array)
 	if !ok {
-		return nil, ErrEval
+		return ErrEval
 	}
+	var (
+		nodes = slices.Clone(a.List)
+		err   error
+	)
 	for i := 0; i < len(nodes); i++ {
 		val, _ := arr.At(value.CreateFloat(float64(i)))
 		switch n := nodes[i].(type) {
@@ -666,7 +670,7 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 		case ast.AssignNode:
 			id, ok := n.Ident.(ast.VarNode)
 			if !ok {
-				return nil, ErrEval
+				return ErrEval
 			}
 			if value.IsUndefined(val) || value.IsNull(val) {
 				val, err = eval(n.Expr, ev)
@@ -677,20 +681,21 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 		case ast.SpreadNode:
 			b, ok := n.Node.(ast.BindingArrayNode)
 			if !ok {
-				return nil, ErrEval
+				return ErrEval
 			}
 			tmp := slices.Clone(b.List)
 			nodes = append(nodes[:i], append(tmp, nodes[i+1:]...)...)
 			i--
 		case ast.BindingObjectNode:
+			err = bindObject(n, val, ev, ro)
 		default:
 			err = ErrEval
 		}
 		if err != nil {
-			return nil, err
+			break
 		}
 	}
-	return res, nil
+	return err
 }
 
 func setVar(v ast.VarNode, n ast.Node, ev env.Environ[value.Value], ro bool) (value.Value, error) {
