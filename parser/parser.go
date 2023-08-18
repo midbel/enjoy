@@ -319,22 +319,49 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 	if err := p.expect(token.Lsquare); err != nil {
 		return nil, err
 	}
-	var arr ast.BindingArrayNode
+	var (
+		arr ast.BindingArrayNode
+		err error
+	)
 	for !p.done() && !p.is(token.Rsquare) {
 		if p.is(token.Comma) {
 			p.next()
 			arr.List = append(arr.List, ast.DiscardNode{})
 			continue
 		}
-		n, err := p.parseNode(powComma)
+		var node ast.Node
+		switch {
+		case p.is(token.Comma):
+			node = ast.DiscardNode{}
+			p.next()
+		case p.is(token.Ident):
+			node = ast.VarNode{
+				Ident: p.curr.Literal,
+			}
+			p.next()
+		case p.is(token.Lbrace):
+			node, err = p.parseObjectBinding()
+		case p.is(token.Spread):
+			p.next()
+			node, err = p.parseArrayBinding()
+		default:
+			return nil, p.unexpected()
+		}
 		if err != nil {
 			return nil, err
 		}
-		arr.List = append(arr.List, n)
+		if _, ok := node.(ast.SpreadNode); !ok && p.is(token.Assign) {
+			ass := ast.AssignNode{
+				Ident: node,
+			}
+			ass.Expr, err = p.parseNode(powComma)
+			node = ass
+		}
+		arr.List = append(arr.List, node)
 		switch {
 		case p.is(token.Comma):
 			p.next()
-			if _, ok := n.(ast.SpreadNode); ok && p.is(token.Rsquare) {
+			if _, ok := node.(ast.SpreadNode); ok && p.is(token.Rsquare) {
 				return nil, p.unexpected()
 			}
 		case p.is(token.Rsquare):
