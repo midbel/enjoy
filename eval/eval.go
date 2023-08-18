@@ -609,18 +609,30 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 		if !ok {
 			return nil, ErrEval
 		}
-		i, ok := a.Ident.(ast.VarNode)
-		if !ok {
-			return nil, ErrEval
-		}
-		if value.IsUndefined(v) && a.Expr != nil {
-			v, err = eval(a.Expr, ev)
-			if err != nil {
+		switch i := a.Ident.(type) {
+		case ast.VarNode:
+			if value.IsUndefined(v) && a.Expr != nil {
+				v, err = eval(a.Expr, ev)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if err := ev.Define(i.Ident, v, ro); err != nil {
 				return nil, err
 			}
-		}
-		if err := ev.Define(i.Ident, v, ro); err != nil {
-			return nil, err
+		case ast.BindingObjectNode:
+			ev.Define(k, v, false)
+			x := ast.VarNode{
+				Ident: k,
+			}
+			if _, err = evalBindObject(i, x, ev, ro); err != nil {
+				return nil, err
+			}
+			if d, ok := ev.(interface{ Delete(string) }); ok {
+				d.Delete(k)
+			}
+		default:
+			return nil, ErrEval
 		}
 	}
 	return res, nil
@@ -663,7 +675,6 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 				err = ev.Define(id.Ident, val, ro)
 			}
 		case ast.SpreadNode:
-			fmt.Println("spread")
 			b, ok := n.Node.(ast.BindingArrayNode)
 			if !ok {
 				return nil, ErrEval
@@ -671,6 +682,7 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 			tmp := slices.Clone(b.List)
 			nodes = append(nodes[:i], append(tmp, nodes[i+1:]...)...)
 			i--
+		case ast.BindingObjectNode:
 		default:
 			err = ErrEval
 		}

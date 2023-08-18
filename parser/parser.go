@@ -274,13 +274,20 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 		p.next()
 		if p.is(token.Colon) {
 			p.next()
-			if !p.is(token.Ident) {
+			switch {
+			case p.is(token.Lbrace):
+				value.Ident, err = p.parseObjectBinding()
+				if err != nil {
+					return nil, err
+				}
+			case p.is(token.Ident):
+				value.Ident = ast.VarNode{
+					Ident: p.curr.Literal,
+				}
+				p.next()
+			default:
 				return nil, p.unexpected()
 			}
-			value.Ident = ast.VarNode{
-				Ident: p.curr.Literal,
-			}
-			p.next()
 		} else {
 			value.Ident = ast.VarNode{
 				Ident: ident,
@@ -610,9 +617,13 @@ func (p *Parser) parseFunction() (ast.Node, error) {
 		fn.Ident = p.curr.Literal
 		p.next()
 	}
+	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
 	if fn.Args, err = p.parseGroup(); err != nil {
 		return nil, err
 	}
+	p.registerPrefix(token.Lsquare, p.parseArray)
+	p.registerPrefix(token.Lbrace, p.parseObject)
 	fn.Body, err = p.parseBody()
 	return fn, err
 }
