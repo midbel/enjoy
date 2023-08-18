@@ -199,26 +199,22 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 }
 
 func (p *Parser) parseLet() (ast.Node, error) {
+	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
+	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+
 	p.next()
-	var (
-		left ast.Node
-		err  error
-	)
-	switch {
-	case p.is(token.Lbrace):
-		left, err = p.parseObjectBinding()
-	case p.is(token.Lsquare):
-		left, err = p.parseArrayBinding()
-	default:
-		left, err = p.parseNode(powUnary)
-	}
+	ident, err := p.parseNode(powUnary)
 	if err != nil {
 		return nil, err
 	}
 	node := ast.LetNode{
-		Ident: left,
+		Ident: ident,
 	}
-	if _, ok := left.(ast.VarNode); p.is(token.EOL) {
+
+	p.registerPrefix(token.Lbrace, p.parseObject)
+	p.registerPrefix(token.Lsquare, p.parseArray)
+
+	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
 		if !ok {
 			return nil, p.unexpected()
 		}
@@ -236,6 +232,9 @@ func (p *Parser) parseLet() (ast.Node, error) {
 }
 
 func (p *Parser) parseConst() (ast.Node, error) {
+	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
+	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+
 	p.next()
 	ident, err := p.parseNode(powUnary)
 	if err != nil {
@@ -247,6 +246,9 @@ func (p *Parser) parseConst() (ast.Node, error) {
 	if err := p.expect(token.Assign); err != nil {
 		return nil, err
 	}
+	p.registerPrefix(token.Lbrace, p.parseObject)
+	p.registerPrefix(token.Lsquare, p.parseArray)
+
 	expr, err := p.parseNode(powLowest)
 	if err != nil {
 		return nil, err
@@ -259,9 +261,49 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 	if err := p.expect(token.Lbrace); err != nil {
 		return nil, err
 	}
-	var node ast.BindingObjectNode
+	list := make(map[string]ast.Node)
 	for !p.done() && !p.is(token.Rbrace) {
-
+		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
+			return nil, p.unexpected()
+		}
+		var (
+			ident = p.curr.Literal
+			value ast.AssignNode
+			err   error
+		)
+		p.next()
+		if p.is(token.Colon) {
+			p.next()
+			if !p.is(token.Ident) {
+				return nil, p.unexpected()
+			}
+			value.Ident = ast.VarNode{
+				Ident: p.curr.Literal,
+			}
+			p.next()
+		} else {
+			value.Ident = ast.VarNode{
+				Ident: ident,
+			}
+		}
+		if p.is(token.Assign) {
+			p.next()
+			value.Expr, err = p.parseNode(powComma)
+			if err != nil {
+				return nil, err
+			}
+		}
+		list[ident] = value
+		switch {
+		case p.is(token.Comma):
+			p.next()
+		case p.is(token.Rbrace):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	node := ast.BindingObjectNode{
+		List: list,
 	}
 	return node, p.expect(token.Rbrace)
 }
@@ -862,6 +904,11 @@ func (p *Parser) parseArray() (ast.Node, error) {
 	}
 	var arr ast.ArrayNode
 	for !p.done() && !p.is(token.Rsquare) {
+		if p.is(token.Comma) {
+			p.next()
+			arr.List = append(arr.List, ast.DiscardNode{})
+			continue
+		}
 		n, err := p.parseNode(powComma)
 		if err != nil {
 			return nil, err

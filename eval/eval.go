@@ -71,7 +71,7 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 	switch n := node.(type) {
 	case ast.NullNode:
 		return value.Null(), nil
-	case ast.UndefinedNode:
+	case ast.UndefinedNode, ast.DiscardNode:
 		return value.Undefined(), nil
 	case ast.ValueNode[string]:
 		return value.CreateString(n.Literal), nil
@@ -604,9 +604,19 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 		if v == nil {
 			v = value.Undefined()
 		}
-		i, ok := n.(ast.VarNode)
+		a, ok := n.(ast.AssignNode)
 		if !ok {
 			return nil, ErrEval
+		}
+		i, ok := a.Ident.(ast.VarNode)
+		if !ok {
+			return nil, ErrEval
+		}
+		if value.IsUndefined(v) && a.Expr != nil {
+			v, err = eval(a.Expr, ev)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if err := ev.Define(i.Ident, v, ro); err != nil {
 			return nil, err
