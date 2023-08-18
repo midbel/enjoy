@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/midbel/enjoy/ast"
@@ -591,9 +592,9 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 	)
 	if n != nil {
 		res, err = eval(n, ev)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 	obj, ok := res.(value.Object)
 	if !ok {
@@ -630,22 +631,23 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 		return nil, ErrEval
 	}
 	var (
-		res = value.Undefined()
-		err error
+		nodes = slices.Clone(a.List)
+		res   = value.Undefined()
+		err   error
 	)
 	if n != nil {
 		res, err = eval(n, ev)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 	arr, ok := res.(value.Array)
 	if !ok {
 		return nil, ErrEval
 	}
-	for i, n := range a.List {
+	for i := 0; i < len(nodes); i++ {
 		val, _ := arr.At(value.CreateFloat(float64(i)))
-		switch n := n.(type) {
+		switch n := nodes[i].(type) {
 		case ast.DiscardNode:
 		case ast.VarNode:
 			err = ev.Define(n.Ident, val, ro)
@@ -661,16 +663,14 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 				err = ev.Define(id.Ident, val, ro)
 			}
 		case ast.SpreadNode:
-			id, ok := n.Node.(ast.VarNode)
+			fmt.Println("spread")
+			b, ok := n.Node.(ast.BindingArrayNode)
 			if !ok {
 				return nil, ErrEval
 			}
-			var vs []value.Value
-			for j := i; j < arr.Len(); j++ {
-				v, _ := arr.At(value.CreateFloat(float64(j)))
-				vs = append(vs, v)
-			}
-			err = ev.Define(id.Ident, value.CreateArray(vs), ro)
+			tmp := slices.Clone(b.List)
+			nodes = append(nodes[:i], append(tmp, nodes[i+1:]...)...)
+			i--
 		default:
 			err = ErrEval
 		}
