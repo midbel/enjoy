@@ -596,6 +596,9 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 			return nil, err
 		}
 	}
+	if value.IsUndefined(res) || value.IsNull(res) {
+		return nil, ErrEval
+	}
 	return res, bindObject(o, res, ev, ro)
 }
 
@@ -648,6 +651,9 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 		if err != nil {
 			return nil, err
 		}
+	}
+	if value.IsUndefined(res) || value.IsNull(res) {
+		return nil, ErrEval
 	}
 	return res, bindArray(a, res, ev, ro)
 }
