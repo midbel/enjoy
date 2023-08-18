@@ -617,13 +617,9 @@ func (p *Parser) parseFunction() (ast.Node, error) {
 		fn.Ident = p.curr.Literal
 		p.next()
 	}
-	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
-	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
 	if fn.Args, err = p.parseGroup(); err != nil {
 		return nil, err
 	}
-	p.registerPrefix(token.Lsquare, p.parseArray)
-	p.registerPrefix(token.Lbrace, p.parseObject)
 	fn.Body, err = p.parseBody()
 	return fn, err
 }
