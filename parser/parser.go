@@ -646,11 +646,42 @@ func (p *Parser) parseFunction() (ast.Node, error) {
 		fn.Ident = p.curr.Literal
 		p.next()
 	}
-	if fn.Args, err = p.parseGroup(); err != nil {
+	if fn.Args, err = p.parseArgs(); err != nil {
 		return nil, err
 	}
 	fn.Body, err = p.parseBody()
 	return fn, err
+}
+
+func (p *Parser) parseArgs() (ast.Node, error) {
+	if err := p.expect(token.Lparen); err != nil {
+		return nil, err
+	}
+	p.enterBinding()
+	defer p.leaveBinding()
+
+	var seq ast.SeqNode
+	for !p.done() && !p.is(token.Rparen) {
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		seq.Nodes = append(seq.Nodes, n)
+		if _, ok := n.(ast.SpreadNode); ok && !p.is(token.Rbrace) {
+			return nil, p.unexpected()
+		}
+		switch {
+		case p.is(token.Comma):
+			p.next()
+			if p.is(token.Rparen) {
+				return nil, p.unexpected()
+			}
+		case p.is(token.Rparen):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return seq, p.expect(token.Rparen)
 }
 
 func (p *Parser) parseReturn() (ast.Node, error) {
