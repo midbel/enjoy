@@ -579,6 +579,7 @@ func evalLet(n ast.LetNode, ev env.Environ[value.Value]) (value.Value, error) {
 	case ast.VarNode:
 		return setVar(x, n.Expr, ev, false)
 	case ast.BindingArrayNode:
+		fmt.Printf("%T: %#[1]v\n", x)
 		return evalBindArray(x, n.Expr, ev, false)
 	case ast.BindingObjectNode:
 		return evalBindObject(x, n.Expr, ev, false)

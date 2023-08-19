@@ -346,6 +346,11 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 		case p.is(token.Spread):
 			p.next()
 			node, err = p.parseArrayBinding()
+			if err == nil {
+				node = ast.SpreadNode{
+					Node: node,
+				}
+			}
 		default:
 			return nil, p.unexpected()
 		}
