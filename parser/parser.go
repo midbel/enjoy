@@ -583,12 +583,22 @@ func (p *Parser) parseWhile() (ast.Node, error) {
 
 func (p *Parser) parseBreak() (ast.Node, error) {
 	p.next()
-	return ast.Break(), nil
+	node := ast.Break()
+	if p.is(token.Ident) {
+		node.Label = p.curr.Literal
+		p.next()
+	}
+	return node, nil
 }
 
 func (p *Parser) parseContinue() (ast.Node, error) {
 	p.next()
-	return ast.Continue(), nil
+	node := ast.Continue()
+	if p.is(token.Ident) {
+		node.Label = p.curr.Literal
+		p.next()
+	}
+	return node, nil
 }
 
 func (p *Parser) parseTry() (ast.Node, error) {
@@ -883,8 +893,13 @@ func (p *Parser) parseBool() (ast.Node, error) {
 }
 
 func (p *Parser) parseIdentifier() (ast.Node, error) {
-	defer p.next()
-	return ast.CreateVar(p.curr.Literal), nil
+	node := ast.CreateVar(p.curr.Literal)
+	p.next()
+	if p.is(token.Colon) {
+		p.next()
+		return ast.Label(node.Ident), nil
+	}
+	return node, nil
 }
 
 func (p *Parser) parseKeyword() (ast.Node, error) {

@@ -76,8 +76,68 @@ func (_ Array) Type() string {
 }
 
 var arrayPrototype = map[string]ValueFunc[Array]{
-	"map":     arrayMap,
-	"forEach": arrayForEach,
+	"at":            arrayAt,
+	"concat":        arrayConcat,
+	"entries":       arrayEntries,
+	"every":         arrayEvery,
+	"fill":          arrayFill,
+	"filter":        arrayFilter,
+	"find":          arrayFind,
+	"findIndex":     arrayFindIndex,
+	"findLast":      arrayFindLast,
+	"findLastIndex": arrayFindLastIndex,
+	"flat":          arrayFlat,
+	"flatMap":       arrayFlatMap,
+	"map":           arrayMap,
+	"forEach":       arrayForEach,
+}
+
+func arrayAt(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayConcat(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayEntries(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayEvery(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFill(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFilter(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFind(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFindIndex(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFindLast(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFindLastIndex(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFlat(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayFlatMap(a Array, args []Value) (Value, error) {
+	return nil, nil
 }
 
 func arrayMap(a Array, args []Value) (Value, error) {

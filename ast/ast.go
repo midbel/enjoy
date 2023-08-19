@@ -46,6 +46,16 @@ func Object(list map[string]Node) ObjectNode {
 	}
 }
 
+type LabelNode struct {
+	Ident string
+}
+
+func Label(ident string) LabelNode {
+	return LabelNode{
+		Ident: ident,
+	}
+}
+
 type VarNode struct {
 	Ident string
 }
