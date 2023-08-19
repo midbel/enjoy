@@ -16,21 +16,51 @@ func CreateValue[T float64 | string | bool](v T) ValueNode[T] {
 
 type NullNode struct{}
 
+func Null() NullNode {
+	return NullNode{}
+}
+
 type UndefinedNode struct{}
+
+func Undefined() UndefinedNode {
+	return UndefinedNode{}
+}
 
 type ArrayNode struct {
 	List []Node
+}
+
+func Array(list []Node) ArrayNode {
+	return ArrayNode{
+		List: list,
+	}
 }
 
 type ObjectNode struct {
 	List map[string]Node
 }
 
+func Object(list map[string]Node) ObjectNode {
+	return ObjectNode{
+		List: list,
+	}
+}
+
 type VarNode struct {
 	Ident string
 }
 
+func CreateVar(id string) VarNode {
+	return VarNode{
+		Ident: id,
+	}
+}
+
 type DiscardNode struct{}
+
+func Discard() DiscardNode {
+	return DiscardNode{}
+}
 
 type TemplateNode struct {
 	Nodes []Node
@@ -52,8 +82,16 @@ type BreakNode struct {
 	Label string
 }
 
+func Break() BreakNode {
+	return BreakNode{}
+}
+
 type ContinueNode struct {
 	Label string
+}
+
+func Continue() ContinueNode {
+	return ContinueNode{}
 }
 
 type MemberNode struct {
@@ -80,8 +118,20 @@ type BindingArrayNode struct {
 	List []Node
 }
 
+func BindArray(list []Node) BindingArrayNode {
+	return BindingArrayNode{
+		List: list,
+	}
+}
+
 type BindingObjectNode struct {
 	List map[string]Node
+}
+
+func BindObject(list map[string]Node) BindingObjectNode {
+	return BindingObjectNode{
+		List: list,
+	}
 }
 
 type UnaryNode struct {

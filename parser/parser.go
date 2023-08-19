@@ -199,8 +199,8 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 }
 
 func (p *Parser) parseLet() (ast.Node, error) {
-	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
-	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+	p.enterBinding()
+	defer p.leaveBinding()
 
 	p.next()
 	ident, err := p.parseNode(powUnary)
@@ -211,9 +211,6 @@ func (p *Parser) parseLet() (ast.Node, error) {
 		Ident: ident,
 	}
 
-	p.registerPrefix(token.Lbrace, p.parseObject)
-	p.registerPrefix(token.Lsquare, p.parseArray)
-
 	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
 		if !ok {
 			return nil, p.unexpected()
@@ -223,7 +220,7 @@ func (p *Parser) parseLet() (ast.Node, error) {
 	if err := p.expect(token.Assign); err != nil {
 		return nil, err
 	}
-	expr, err := p.parseNode(powLowest)
+	expr, err := p.parseNodeInBinding(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -232,8 +229,8 @@ func (p *Parser) parseLet() (ast.Node, error) {
 }
 
 func (p *Parser) parseConst() (ast.Node, error) {
-	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
-	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+	p.enterBinding()
+	defer p.leaveBinding()
 
 	p.next()
 	ident, err := p.parseNode(powUnary)
@@ -246,15 +243,29 @@ func (p *Parser) parseConst() (ast.Node, error) {
 	if err := p.expect(token.Assign); err != nil {
 		return nil, err
 	}
-	p.registerPrefix(token.Lbrace, p.parseObject)
-	p.registerPrefix(token.Lsquare, p.parseArray)
 
-	expr, err := p.parseNode(powLowest)
+	expr, err := p.parseNodeInBinding(powLowest)
 	if err != nil {
 		return nil, err
 	}
 	node.Expr = expr
 	return node, nil
+}
+
+func (p *Parser) enterBinding() {
+	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
+	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+}
+
+func (p *Parser) leaveBinding() {
+	p.registerPrefix(token.Lbrace, p.parseObject)
+	p.registerPrefix(token.Lsquare, p.parseArray)
+}
+
+func (p *Parser) parseNodeInBinding(pow int) (ast.Node, error) {
+	p.leaveBinding()
+	defer p.enterBinding()
+	return p.parseNode(pow)
 }
 
 func (p *Parser) parseObjectBinding() (ast.Node, error) {
@@ -281,21 +292,17 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 					return nil, err
 				}
 			case p.is(token.Ident):
-				value.Ident = ast.VarNode{
-					Ident: p.curr.Literal,
-				}
+				value.Ident = ast.CreateVar(p.curr.Literal)
 				p.next()
 			default:
 				return nil, p.unexpected()
 			}
 		} else {
-			value.Ident = ast.VarNode{
-				Ident: ident,
-			}
+			value.Ident = ast.CreateVar(ident)
 		}
 		if p.is(token.Assign) {
 			p.next()
-			value.Expr, err = p.parseNode(powComma)
+			value.Expr, err = p.parseNodeInBinding(powComma)
 			if err != nil {
 				return nil, err
 			}
@@ -309,10 +316,7 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 			return nil, p.unexpected()
 		}
 	}
-	node := ast.BindingObjectNode{
-		List: list,
-	}
-	return node, p.expect(token.Rbrace)
+	return ast.BindObject(list), p.expect(token.Rbrace)
 }
 
 func (p *Parser) parseArrayBinding() (ast.Node, error) {
@@ -320,24 +324,22 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 		return nil, err
 	}
 	var (
-		arr ast.BindingArrayNode
-		err error
+		list []ast.Node
+		err  error
 	)
 	for !p.done() && !p.is(token.Rsquare) {
 		if p.is(token.Comma) {
 			p.next()
-			arr.List = append(arr.List, ast.DiscardNode{})
+			list = append(list, ast.Discard())
 			continue
 		}
 		var node ast.Node
 		switch {
 		case p.is(token.Comma):
-			node = ast.DiscardNode{}
+			node = ast.Discard()
 			p.next()
 		case p.is(token.Ident):
-			node = ast.VarNode{
-				Ident: p.curr.Literal,
-			}
+			node = ast.CreateVar(p.curr.Literal)
 			p.next()
 		case p.is(token.Lbrace):
 			node, err = p.parseObjectBinding()
@@ -354,10 +356,10 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 			ass := ast.AssignNode{
 				Ident: node,
 			}
-			ass.Expr, err = p.parseNode(powComma)
+			ass.Expr, err = p.parseNodeInBinding(powComma)
 			node = ass
 		}
-		arr.List = append(arr.List, node)
+		list = append(list, node)
 		switch {
 		case p.is(token.Comma):
 			p.next()
@@ -369,17 +371,17 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 			return nil, p.unexpected()
 		}
 	}
-	return arr, p.expect(token.Rsquare)
+	return ast.BindArray(list), p.expect(token.Rsquare)
 }
 
 func (p *Parser) parseNull() (ast.Node, error) {
 	defer p.next()
-	return ast.NullNode{}, nil
+	return ast.Null(), nil
 }
 
 func (p *Parser) parseUndefined() (ast.Node, error) {
 	defer p.next()
-	return ast.UndefinedNode{}, nil
+	return ast.Undefined(), nil
 }
 
 func (p *Parser) parseOperatorKeyword(left ast.Node) (ast.Node, error) {
@@ -576,12 +578,12 @@ func (p *Parser) parseWhile() (ast.Node, error) {
 
 func (p *Parser) parseBreak() (ast.Node, error) {
 	p.next()
-	return ast.BreakNode{}, nil
+	return ast.Break(), nil
 }
 
 func (p *Parser) parseContinue() (ast.Node, error) {
 	p.next()
-	return ast.ContinueNode{}, nil
+	return ast.Continue(), nil
 }
 
 func (p *Parser) parseTry() (ast.Node, error) {
@@ -846,10 +848,7 @@ func (p *Parser) parseBool() (ast.Node, error) {
 
 func (p *Parser) parseIdentifier() (ast.Node, error) {
 	defer p.next()
-	node := ast.VarNode{
-		Ident: p.curr.Literal,
-	}
-	return node, nil
+	return ast.CreateVar(p.curr.Literal), nil
 }
 
 func (p *Parser) parseKeyword() (ast.Node, error) {
@@ -899,9 +898,7 @@ func (p *Parser) parseObject() (ast.Node, error) {
 		ident := p.curr.Literal
 		p.next()
 		if p.is(token.Comma) || p.is(token.Rbrace) {
-			list[ident] = ast.VarNode{
-				Ident: ident,
-			}
+			list[ident] = ast.CreateVar(ident)
 			if p.is(token.Comma) {
 				p.next()
 			}
@@ -923,28 +920,25 @@ func (p *Parser) parseObject() (ast.Node, error) {
 			return nil, p.unexpected()
 		}
 	}
-	node := ast.ObjectNode{
-		List: list,
-	}
-	return node, p.expect(token.Rbrace)
+	return ast.Object(list), p.expect(token.Rbrace)
 }
 
 func (p *Parser) parseArray() (ast.Node, error) {
 	if err := p.expect(token.Lsquare); err != nil {
 		return nil, err
 	}
-	var arr ast.ArrayNode
+	var list []ast.Node
 	for !p.done() && !p.is(token.Rsquare) {
 		if p.is(token.Comma) {
 			p.next()
-			arr.List = append(arr.List, ast.DiscardNode{})
+			list = append(list, ast.Discard())
 			continue
 		}
 		n, err := p.parseNode(powComma)
 		if err != nil {
 			return nil, err
 		}
-		arr.List = append(arr.List, n)
+		list = append(list, n)
 		switch {
 		case p.is(token.Comma):
 			p.next()
@@ -953,7 +947,7 @@ func (p *Parser) parseArray() (ast.Node, error) {
 			return nil, p.unexpected()
 		}
 	}
-	return arr, p.expect(token.Rsquare)
+	return ast.Array(list), p.expect(token.Rsquare)
 }
 
 func (p *Parser) parseSpread() (ast.Node, error) {
