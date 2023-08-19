@@ -80,6 +80,7 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"concat":        arrayConcat,
 	"entries":       arrayEntries,
 	"every":         arrayEvery,
+	"forEach":       arrayForEach,
 	"fill":          arrayFill,
 	"filter":        arrayFilter,
 	"find":          arrayFind,
@@ -88,8 +89,45 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"findLastIndex": arrayFindLastIndex,
 	"flat":          arrayFlat,
 	"flatMap":       arrayFlatMap,
+	"includes":      arrayIncludes,
+	"indexOf":       arrayIndexOf,
+	"join":          arrayJoin,
+	"keys":          arrayKeys,
+	"lastIndexOf":   arrayLastIndexOf,
 	"map":           arrayMap,
-	"forEach":       arrayForEach,
+	"pop":           arrayPop,
+	"push":          arrayPush,
+	"reduce":        arrayReduce,
+	"reduceRight":   arrayReduceRight,
+	"reverse":       arrayReverse,
+	"shift":         arrayShift,
+	"slice":         arraySlice,
+	"some":          arraySome,
+	"sort":          arraySort,
+	"splice":        arraySplice,
+	"unshift":       arrayUnshift,
+	"values":        arrayValues,
+	"with":          arrayWith,
+}
+
+func arrayKeys(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayJoin(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayIncludes(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayIndexOf(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayLastIndexOf(a Array, args []Value) (Value, error) {
+	return nil, nil
 }
 
 func arrayAt(a Array, args []Value) (Value, error) {
@@ -106,6 +144,58 @@ func arrayEntries(a Array, args []Value) (Value, error) {
 
 func arrayEvery(a Array, args []Value) (Value, error) {
 	return nil, nil
+}
+
+func arraySome(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayPop(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayPush(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arraySplice(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arraySlice(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayReverse(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayShift(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arraySort(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayUnshift(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayValues(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayWith(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayReduce(a Array, args []Value) (Value, error) {
+
+}
+
+func arrayReduceRight(a Array, args []Value) (Value, error) {
+
 }
 
 func arrayFill(a Array, args []Value) (Value, error) {
