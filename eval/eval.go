@@ -463,6 +463,11 @@ func evalBinary(n ast.BinaryNode, ev env.Environ[value.Value]) (value.Value, err
 		return nil, err
 	}
 	switch n.Op {
+	case token.Nullish:
+		if value.IsNull(left) || value.IsUndefined(left) {
+			return right, nil
+		}
+		return left, nil
 	case token.Add:
 		return addValues(left, right)
 	case token.Sub:
