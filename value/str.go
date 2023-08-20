@@ -103,13 +103,13 @@ var stringPrototype = map[string]ValueFunc[Str]{
 	"padStart":    nil,
 	"repeat":      nil,
 	"replace":     nil,
-	"replaceAll":  CheckArity(2, strReplaceAllCall),
+	"replaceAll":  CheckArity(2, strReplaceAll),
 	"slice":       nil,
 	"split":       nil,
 	"startsWith":  CheckArity(1, strStartsWith),
 	"substring":   CheckArity(1, strSubstring),
-	"toUpperCase": CheckArity(0, strUpperCall),
-	"toLowerCase": CheckArity(0, strLowerCall),
+	"toUpperCase": CheckArity(0, strUpper),
+	"toLowerCase": CheckArity(0, strLower),
 	"trim":        CheckArity(0, strTrim),
 	"trimEnd":     CheckArity(0, strTrimRight),
 	"trimStart":   CheckArity(0, strTrimLeft),
@@ -168,7 +168,7 @@ func strTrimRight(s Str, _ []Value) (Value, error) {
 	return CreateString(str), nil
 }
 
-func strReplaceAllCall(s Str, args []Value) (Value, error) {
+func strReplaceAll(s Str, args []Value) (Value, error) {
 	s1, ok := args[0].(Str)
 	if !ok {
 		return nil, ErrIncompatible
@@ -181,12 +181,12 @@ func strReplaceAllCall(s Str, args []Value) (Value, error) {
 	return s, nil
 }
 
-func strUpperCall(s Str, _ []Value) (Value, error) {
+func strUpper(s Str, _ []Value) (Value, error) {
 	s.value = strings.ToUpper(s.value)
 	return s, nil
 }
 
-func strLowerCall(s Str, _ []Value) (Value, error) {
+func strLower(s Str, _ []Value) (Value, error) {
 	s.value = strings.ToUpper(s.value)
 	return s, nil
 }
