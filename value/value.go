@@ -181,3 +181,11 @@ func (s Spread) Spread() []Value {
 		return nil
 	}
 }
+
+func toNativeInt(v Value) (int, error) {
+	v, err := Coerce(v)
+	if err != nil {
+		return 0, err
+	}
+	return int(v.value), nil
+}

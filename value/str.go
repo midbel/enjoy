@@ -94,9 +94,78 @@ func (b Str) Type() string {
 }
 
 var stringPrototype = map[string]ValueFunc[Str]{
+	"at":          nil,
+	"concat":      nil,
+	"endsWith":    nil,
+	"includes":    nil,
+	"indexOf":     nil,
+	"padEnd":      nil,
+	"padStart":    nil,
+	"repeat":      nil,
+	"replace":     nil,
+	"replaceAll":  CheckArity(2, strReplaceAllCall),
+	"slice":       nil,
+	"split":       nil,
+	"startsWith":  CheckArity(1, strStartsWith),
+	"substring":   CheckArity(1, strSubstring),
 	"toUpperCase": CheckArity(0, strUpperCall),
 	"toLowerCase": CheckArity(0, strLowerCall),
-	"replaceAll":  CheckArity(2, strReplaceAllCall),
+	"trim":        CheckArity(0, strTrim),
+	"trimEnd":     CheckArity(0, strTrimRight),
+	"trimStart":   CheckArity(0, strTrimLeft),
+	"trimLeft":    CheckArity(0, strTrimLeft),
+	"trimRight":   CheckArity(0, strTrimRight),
+}
+
+func strStartsWith(s Str, args []Value) (Value, error) {
+	var (
+		offset int
+		err    error
+	)
+	if len(args) == 2 {
+		offset, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if offset > len(s.value) || offset < 0 {
+			return Undefined(), ErrIndex
+		}
+	}
+	ok := strings.Contains(s.value[offset:], args[0].String())
+	return CreateBool(ok)
+}
+
+func strSubstr(s Str, args []Value) (Value, error) {
+	start, err := toNativeInt(args[0])
+	if err != nil {
+		return nil, err
+	}
+	end := len(s.value)
+	if len(args) == 2 {
+		end, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if start >= end {
+		return Undefined(), ErrIndex
+	}
+	return CreateString(s.value[start:end]), nil
+}
+
+func strTrim(s Str, _ []Value) (Value, error) {
+	str := strings.TrimSpace(s.value)
+	return CreateString(str), nil
+}
+
+func strTrimLeft(s Str, _ []Value) (Value, error) {
+	str := strings.TrimLeftFunc(s.value, unicode.IsSpace)
+	return CreateString(str), nil
+}
+
+func strTrimRight(s Str, _ []Value) (Value, error) {
+	str := strings.TrimRightFunc(s.value, unicode.IsSpace)
+	return CreateString(str), nil
 }
 
 func strReplaceAllCall(s Str, args []Value) (Value, error) {
