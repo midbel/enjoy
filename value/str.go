@@ -127,7 +127,7 @@ func strAt(s Str, args []Value) (Value, error) {
 		ix = len(s.value) + ix
 	}
 	if ix < 0 || ix >= len(s.value) {
-		return nil, ErrIndex
+		return Undefined(), ErrIndex
 	}
 	b := s.value[ix : ix+1]
 	return CreateString(b), nil

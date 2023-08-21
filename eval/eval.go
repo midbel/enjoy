@@ -151,12 +151,17 @@ func evalReturn(n ast.ReturnNode, ev env.Environ[value.Value]) (value.Value, err
 }
 
 func evalCall(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, error) {
+	var (
+		res value.Value
+		err error
+	)
 	switch m := n.Ident.(type) {
 	case ast.MemberNode:
-		return callMember(m, n.Args, ev)
+		res, err = callMember(m, n.Args, ev)
 	default:
-		return callDefault(n, ev)
+		res, err = callDefault(n, ev)
 	}
+	return res, err
 }
 
 func callMember(n ast.MemberNode, args ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
