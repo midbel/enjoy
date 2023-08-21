@@ -187,5 +187,9 @@ func toNativeInt(v Value) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int(v.value), nil
+	f, ok := v.(Float)
+	if !ok {
+		return 0, nil
+	}
+	return int(f.value), nil
 }

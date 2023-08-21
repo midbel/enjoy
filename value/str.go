@@ -3,6 +3,7 @@ package value
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type Str struct {
@@ -94,20 +95,20 @@ func (b Str) Type() string {
 }
 
 var stringPrototype = map[string]ValueFunc[Str]{
-	"at":          nil,
-	"concat":      nil,
-	"endsWith":    nil,
-	"includes":    nil,
-	"indexOf":     nil,
-	"padEnd":      nil,
-	"padStart":    nil,
-	"repeat":      nil,
-	"replace":     nil,
+	"at":          CheckArity(1, strAt),
+	"concat":      CheckArity(-1, strConcat),
+	"endsWith":    CheckArity(1, strEndsWith),
+	"includes":    CheckArity(1, strIncludes),
+	"indexOf":     CheckArity(1, strIndexOf),
+	"padEnd":      CheckArity(1, strPadEnd),
+	"padStart":    CheckArity(1, strPadStart),
+	"repeat":      CheckArity(1, strRepeat),
+	"replace":     CheckArity(2, strReplace),
 	"replaceAll":  CheckArity(2, strReplaceAll),
-	"slice":       nil,
-	"split":       nil,
+	"slice":       CheckArity(1, strSlice),
+	"split":       CheckArity(0, strSplit),
 	"startsWith":  CheckArity(1, strStartsWith),
-	"substring":   CheckArity(1, strSubstring),
+	"substring":   CheckArity(1, strSubstr),
 	"toUpperCase": CheckArity(0, strUpper),
 	"toLowerCase": CheckArity(0, strLower),
 	"trim":        CheckArity(0, strTrim),
@@ -117,7 +118,49 @@ var stringPrototype = map[string]ValueFunc[Str]{
 	"trimRight":   CheckArity(0, strTrimRight),
 }
 
-func strStartsWith(s Str, args []Value) (Value, error) {
+func strAt(s Str, args []Value) (Value, error) {
+	ix, err := toNativeInt(args[0])
+	if err != nil {
+		return nil, err
+	}
+	if ix < 0 {
+		ix = len(s.value) + ix
+	}
+	if ix < 0 || ix >= len(s.value) {
+		return nil, ErrIndex
+	}
+	b := s.value[ix : ix+1]
+	return CreateString(b), nil
+}
+
+func strConcat(s Str, args []Value) (Value, error) {
+	var list []string
+	list = append(list, s.String())
+	for _, a := range args {
+		list = append(list, a.String())
+	}
+	return CreateString(strings.Join(list, "")), nil
+}
+
+func strEndsWith(s Str, args []Value) (Value, error) {
+	var (
+		offset int
+		err    error
+	)
+	if len(args) == 2 {
+		offset, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if offset > len(s.value) || offset < 0 {
+			return Undefined(), ErrIndex
+		}
+	}
+	ok := strings.HasSuffix(s.value[offset:], args[0].String())
+	return CreateBool(ok), nil
+}
+
+func strIncludes(s Str, args []Value) (Value, error) {
 	var (
 		offset int
 		err    error
@@ -132,7 +175,172 @@ func strStartsWith(s Str, args []Value) (Value, error) {
 		}
 	}
 	ok := strings.Contains(s.value[offset:], args[0].String())
-	return CreateBool(ok)
+	return CreateBool(ok), nil
+}
+
+func strIndexOf(s Str, args []Value) (Value, error) {
+	var (
+		pat = args[0].String()
+		pos int
+		err error
+	)
+	if len(args) >= 2 {
+		pos, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if pos < 0 {
+			pos = len(s.value) + pos
+		}
+	}
+	x := strings.Index(s.value[pos:], pat)
+	return CreateFloat(float64(x)), nil
+}
+
+func strPadEnd(s Str, args []Value) (Value, error) {
+	var (
+		size int
+		err  error
+		char = " "
+	)
+	if size, err = toNativeInt(args[0]); err != nil {
+		return nil, err
+	}
+	if len(s.value) >= size {
+		return s, nil
+	}
+	if len(args) >= 2 {
+		char = args[1].String()
+	}
+	str := strings.Repeat(char, size-len(s.value))
+	return CreateString(s.value + str), nil
+}
+
+func strPadStart(s Str, args []Value) (Value, error) {
+	var (
+		size int
+		err  error
+		char = " "
+	)
+	if size, err = toNativeInt(args[0]); err != nil {
+		return nil, err
+	}
+	if len(s.value) >= size {
+		return s, nil
+	}
+	if len(args) >= 2 {
+		char = args[1].String()
+	}
+	str := strings.Repeat(char, size-len(s.value))
+	return CreateString(str + s.value), nil
+}
+
+func strRepeat(s Str, args []Value) (Value, error) {
+	r, err := toNativeInt(args[0])
+	if err != nil {
+		return nil, err
+	}
+	if r <= 0 {
+		return nil, ErrArgument
+	}
+	s.value = strings.Repeat(s.value, r)
+	return s, nil
+}
+
+func strReplace(s Str, args []Value) (Value, error) {
+	pat := args[0].String()
+	rep := args[1].String()
+
+	s.value = strings.Replace(s.value, pat, rep, 1)
+	return s, nil
+}
+
+func strSlice(s Str, args []Value) (Value, error) {
+	var (
+		beg = 0
+		end = len(s.value)
+		err error
+	)
+	switch len(args) {
+	case 1:
+		beg, err = toNativeInt(args[0])
+		if err != nil {
+			return nil, err
+		}
+	case 2:
+		beg, err = toNativeInt(args[0])
+		if err != nil {
+			return nil, err
+		}
+		end, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, ErrArgument
+	}
+	if beg < 0 {
+		beg = len(s.value) + beg
+	}
+	if end < 0 {
+		end = len(s.value) + end
+	}
+	if beg > len(s.value) || beg >= end {
+		return CreateString(""), nil
+	}
+	return CreateString(s.value[beg:end]), nil
+}
+
+func strSplit(s Str, args []Value) (Value, error) {
+	var (
+		limit int
+		err   error
+		sep   string
+	)
+	switch len(args) {
+	case 0:
+		return CreateArray([]Value{s}), nil
+	case 1:
+		limit--
+		sep = args[0].String()
+	case 2:
+		sep = args[0].String()
+		limit, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if limit == 0 {
+			return CreateArray(nil), nil
+		}
+	default:
+		return nil, ErrArgument
+	}
+	var (
+		parts = strings.Split(s.value, sep)
+		list  []Value
+	)
+	for i := 0; i < limit && i < len(parts); i++ {
+		list = append(list, CreateString(parts[i]))
+	}
+	return CreateArray(list), nil
+}
+
+func strStartsWith(s Str, args []Value) (Value, error) {
+	var (
+		offset int
+		err    error
+	)
+	if len(args) >= 2 {
+		offset, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if offset > len(s.value) || offset < 0 {
+			return Undefined(), ErrIndex
+		}
+	}
+	ok := strings.HasPrefix(s.value[offset:], args[0].String())
+	return CreateBool(ok), nil
 }
 
 func strSubstr(s Str, args []Value) (Value, error) {

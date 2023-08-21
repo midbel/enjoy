@@ -191,11 +191,11 @@ func arrayWith(a Array, args []Value) (Value, error) {
 }
 
 func arrayReduce(a Array, args []Value) (Value, error) {
-
+	return nil, nil
 }
 
 func arrayReduceRight(a Array, args []Value) (Value, error) {
-
+	return nil, nil
 }
 
 func arrayFill(a Array, args []Value) (Value, error) {
