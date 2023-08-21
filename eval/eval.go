@@ -100,6 +100,8 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return evalSeq(n, ev)
 	case ast.BlockNode:
 		return evalBlock(n, ev)
+	case ast.LabelNode:
+		return evalLabel(n, ev)
 	case ast.BreakNode:
 		return nil, ErrBreak
 	case ast.ContinueNode:
@@ -730,6 +732,10 @@ func setVar(v ast.VarNode, n ast.Node, ev env.Environ[value.Value], ro bool) (va
 		err = ev.Define(v.Ident, res, ro)
 	}
 	return res, err
+}
+
+func evalLabel(n ast.LabelNode, ev env.Environ[value.Value]) (value.Value, error) {
+	return nil, nil
 }
 
 func evalBlock(n ast.BlockNode, ev env.Environ[value.Value]) (value.Value, error) {

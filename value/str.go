@@ -119,18 +119,7 @@ var stringPrototype = map[string]ValueFunc[Str]{
 }
 
 func strAt(s Str, args []Value) (Value, error) {
-	ix, err := toNativeInt(args[0])
-	if err != nil {
-		return nil, err
-	}
-	if ix < 0 {
-		ix = len(s.value) + ix
-	}
-	if ix < 0 || ix >= len(s.value) {
-		return Undefined(), ErrIndex
-	}
-	b := s.value[ix : ix+1]
-	return CreateString(b), nil
+	return s.At(args[0])
 }
 
 func strConcat(s Str, args []Value) (Value, error) {
@@ -147,7 +136,7 @@ func strEndsWith(s Str, args []Value) (Value, error) {
 		offset int
 		err    error
 	)
-	if len(args) == 2 {
+	if len(args) >= 2 {
 		offset, err = toNativeInt(args[1])
 		if err != nil {
 			return nil, err
@@ -165,7 +154,7 @@ func strIncludes(s Str, args []Value) (Value, error) {
 		offset int
 		err    error
 	)
-	if len(args) == 2 {
+	if len(args) >= 2 {
 		offset, err = toNativeInt(args[1])
 		if err != nil {
 			return nil, err
@@ -349,7 +338,7 @@ func strSubstr(s Str, args []Value) (Value, error) {
 		return nil, err
 	}
 	end := len(s.value)
-	if len(args) == 2 {
+	if len(args) >= 2 {
 		end, err = toNativeInt(args[1])
 		if err != nil {
 			return nil, err
