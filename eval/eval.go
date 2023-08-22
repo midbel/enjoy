@@ -321,63 +321,6 @@ func argObject(prm value.Parameter, obj value.Object, ev env.Environ[value.Value
 	return nil
 }
 
-func prepareArgs2(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (env.Environ[value.Value], error) {
-	var (
-		tmp = env.EnclosedEnv[value.Value](fn.Env)
-		arg value.Value
-		err error
-	)
-	for i := 0; i < len(fn.Params); i++ {
-		p := fn.Params[i]
-		if i >= len(args) {
-			arg = value.Undefined()
-			if p.Value != nil {
-				arg, err = eval(p.Value, ev)
-			}
-			if err != nil {
-				return nil, err
-			}
-			if err = tmp.Define(p.Name, arg, false); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		arg = args[i]
-		if s, ok := arg.(value.Spread); ok {
-			for _, a := range s.Spread() {
-				if i >= len(fn.Params) {
-					break
-				}
-				if err := tmp.Define(fn.Params[i].Name, a, false); err != nil {
-					return nil, err
-				}
-				i++
-			}
-			continue
-		}
-		if obj, ok := arg.(value.Object); ok && p.Name == "" {
-			n, ok := p.Value.(ast.ObjectNode)
-			if !ok {
-				return nil, ErrEval
-			}
-			for k := range n.List {
-				arg, _ = obj.Get(k)
-				if err := tmp.Define(k, arg, false); err != nil {
-					return nil, err
-				}
-			}
-			continue
-		}
-		if p.Name == "" {
-			return nil, ErrEval
-		}
-		if err = tmp.Define(p.Name, arg, false); err != nil {
-			return nil, err
-		}
-	}
-	return tmp, nil
-}
-
 func execUserFunc(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (value.Value, error) {
 	tmp, err := prepareArgs(fn, args, ev)
 	if err != nil {
