@@ -274,6 +274,20 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 	}
 	list := make(map[string]ast.Node)
 	for !p.done() && !p.is(token.Rbrace) {
+		if p.is(token.Spread) {
+			p.next()
+			if !p.is(token.Ident) {
+				return nil, p.unexpected()
+			}
+			list[p.curr.Literal] = ast.SpreadNode{
+				Node: ast.CreateVar(p.curr.Literal),
+			}
+			p.next()
+			if !p.is(token.Rbrace) {
+				return nil, p.unexpected()
+			}
+			continue
+		}
 		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
 			return nil, p.unexpected()
 		}
@@ -345,10 +359,17 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 			node, err = p.parseObjectBinding()
 		case p.is(token.Spread):
 			p.next()
-			node, err = p.parseArrayBinding()
-			if err == nil {
+			if p.is(token.Ident) {
 				node = ast.SpreadNode{
-					Node: node,
+					Node: ast.CreateVar(p.curr.Literal),
+				}
+				p.next()
+			} else {
+				node, err = p.parseArrayBinding()
+				if err == nil {
+					node = ast.SpreadNode{
+						Node: node,
+					}
 				}
 			}
 		default:
@@ -361,6 +382,7 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 			ass := ast.AssignNode{
 				Ident: node,
 			}
+			p.next()
 			ass.Expr, err = p.parseNodeInBinding(powComma)
 			node = ass
 		}
@@ -729,7 +751,8 @@ func (p *Parser) parseAssign(left ast.Node) (ast.Node, error) {
 	}
 	op := p.curr.Type
 	p.next()
-	expr, err := p.parseNode(powAssign)
+
+	expr, err := p.parseNodeInBinding(powAssign)
 	if err != nil {
 		return nil, err
 	}

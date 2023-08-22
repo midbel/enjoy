@@ -8,7 +8,7 @@ import (
 var (
 	ErrDefined    = errors.New("variable already defined")
 	ErrNotDefined = errors.New("variable not defined")
-	ErrAssign     = errors.New("variable can be assigned")
+	ErrAssign     = errors.New("variable can not be assigned")
 )
 
 type Environ[T any] interface {
@@ -27,12 +27,12 @@ func Immutable[T any](env Environ[T]) Environ[T] {
 	}
 }
 
-func (_ ImmutableEnv[T]) Define(_ string, _ T, _ bool) error {
-	return ErrAssign
+func (_ ImmutableEnv[T]) Define(ident string, _ T, _ bool) error {
+	return fmt.Errorf("%s: %w", ident, ErrAssign)
 }
 
-func (_ ImmutableEnv[T]) Assign(_ string, _ T) error {
-	return ErrAssign
+func (_ ImmutableEnv[T]) Assign(ident string, _ T) error {
+	return fmt.Errorf("%s: %w", ident, ErrAssign)
 }
 
 type Env[T any] struct {
@@ -75,7 +75,7 @@ func (e *Env[T]) Assign(ident string, val T) error {
 	v, ok := e.values[ident]
 	if ok {
 		if v.ro {
-			return ErrAssign
+			return fmt.Errorf("%s: %w", ident, ErrAssign)
 		}
 		v.value = val
 		e.values[ident] = v

@@ -179,7 +179,7 @@ func callMember(n ast.MemberNode, args ast.Node, ev env.Environ[value.Value]) (v
 	if !ok {
 		return nil, value.ErrOperation
 	}
-	values, err := seqValues(args, ev)
+	values, err := callArgs(args, ev)
 	if err != nil {
 		return nil, err
 	}
@@ -195,21 +195,21 @@ func callDefault(n ast.CallNode, ev env.Environ[value.Value]) (value.Value, erro
 	if err != nil {
 		return nil, err
 	}
-	values, err := seqValues(n.Args, ev)
+	args, err := callArgs(n.Args, ev)
 	if err != nil {
 		return nil, err
 	}
 	switch call := call.(type) {
 	case value.Func:
-		return execUserFunc(call, values, ev)
+		return execUserFunc(call, args, ev)
 	case value.Builtin:
-		return execBuiltinFunc(call, values)
+		return execBuiltinFunc(call, args)
 	default:
 		return nil, ErrEval
 	}
 }
 
-func seqValues(n ast.Node, ev env.Environ[value.Value]) ([]value.Value, error) {
+func callArgs(n ast.Node, ev env.Environ[value.Value]) ([]value.Value, error) {
 	seq, ok := n.(ast.SeqNode)
 	if !ok {
 		return nil, ErrEval
@@ -230,6 +230,92 @@ func execBuiltinFunc(fn value.Builtin, args []value.Value) (value.Value, error) 
 }
 
 func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (env.Environ[value.Value], error) {
+	var (
+		tmp = env.EnclosedEnv[value.Value](fn.Env)
+		arg value.Value
+		err error
+	)
+	for i := 0; i < len(fn.Params); i++ {
+		p := fn.Params[i]
+		if i < len(args) {
+			arg = args[i]
+		} else {
+			arg = value.Undefined()
+		}
+		arg, err = argValue(p, arg, tmp)
+		if err != nil {
+			return nil, err
+		}
+		switch arg := arg.(type) {
+		case value.Object:
+			err = argObject(p, arg, tmp)
+		case value.Array:
+			err = argArray(p, arg, tmp)
+		case value.Spread:
+		default:
+			err = tmp.Define(p.Name, arg, false)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tmp, err
+}
+
+func argValue(prm value.Parameter, arg value.Value, ev env.Environ[value.Value]) (value.Value, error) {
+	if !value.IsUndefined(arg) && !value.IsNull(arg) {
+		return arg, nil
+	}
+	if prm.Value == nil {
+		return arg, nil
+	}
+	switch a := prm.Value.(type) {
+	case ast.AssignNode:
+		return eval(a.Expr, ev)
+	case ast.BindingArrayNode:
+	case ast.BindingObjectNode:
+	default:
+		return eval(prm.Value, ev)
+	}
+	return arg, nil
+}
+
+func argObject(prm value.Parameter, obj value.Object, ev env.Environ[value.Value]) error {
+	switch a := prm.Value.(type) {
+	case ast.AssignNode:
+		prm.Value = a.Ident
+		return argObject(prm, obj, ev)
+	case ast.BindingObjectNode:
+		for k, n := range a.List {
+			v, err := obj.Get(k)
+			if err != nil || value.IsUndefined(v) || value.IsNull(v) {
+				a, ok := n.(ast.AssignNode)
+				if !ok {
+					return ErrEval
+				}
+				v, err = eval(a.Expr, ev)
+				if err != nil {
+					return err
+				}
+			}
+			if err = ev.Define(k, v, false); err != nil {
+				return err
+			}
+		}
+	default:
+		if prm.Name == "" {
+			return ErrEval
+		}
+		return ev.Define(prm.Name, obj, false)
+	}
+	return nil
+}
+
+func argArray(prm value.Parameter, arr value.Array, ev env.Environ[value.Value]) error {
+	return nil
+}
+
+func prepareArgs2(fn value.Func, args []value.Value, ev env.Environ[value.Value]) (env.Environ[value.Value], error) {
 	var (
 		tmp = env.EnclosedEnv[value.Value](fn.Env)
 		arg value.Value
@@ -339,15 +425,15 @@ func evalFunc(n ast.FuncNode, ev env.Environ[value.Value]) (value.Value, error) 
 		var p value.Parameter
 		switch g := a.(type) {
 		case ast.AssignNode:
-			i, ok := g.Ident.(ast.VarNode)
-			if !ok {
-				return nil, ErrEval
+			if i, ok := g.Ident.(ast.VarNode); ok {
+				p.Name = i.Ident
+				p.Value = g.Expr
+			} else {
+				p.Value = a
 			}
-			p.Name = i.Ident
-			p.Value = g.Expr
 		case ast.VarNode:
 			p.Name = g.Ident
-		case ast.ObjectNode:
+		case ast.BindingArrayNode, ast.BindingObjectNode:
 			p.Value = a
 		default:
 			return nil, ErrEval
@@ -586,7 +672,6 @@ func evalLet(n ast.LetNode, ev env.Environ[value.Value]) (value.Value, error) {
 	case ast.VarNode:
 		return setVar(x, n.Expr, ev, false)
 	case ast.BindingArrayNode:
-		fmt.Printf("%T: %#[1]v\n", x)
 		return evalBindArray(x, n.Expr, ev, false)
 	case ast.BindingObjectNode:
 		return evalBindObject(x, n.Expr, ev, false)
