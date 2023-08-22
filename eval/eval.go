@@ -252,6 +252,15 @@ func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value])
 		case value.Array:
 			err = argArray(p, arg, tmp)
 		case value.Spread:
+			for _, a := range arg.Spread() {
+				if i >= len(fn.Params) {
+					break
+				}
+				if err := tmp.Define(fn.Params[i].Name, a, false); err != nil {
+					return nil, err
+				}
+				i++
+			}
 		default:
 			err = tmp.Define(p.Name, arg, false)
 		}
@@ -280,38 +289,35 @@ func argValue(prm value.Parameter, arg value.Value, ev env.Environ[value.Value])
 	return arg, nil
 }
 
+func argArray(prm value.Parameter, arr value.Array, ev env.Environ[value.Value]) error {
+	switch a := prm.Value.(type) {
+	case ast.AssignNode:
+		prm.Value = a.Ident
+		return argArray(prm, arr, ev)
+	case ast.BindingArrayNode:
+		return bindArray(a, arr, ev, false)
+	default:
+		if prm.Name == "" {
+			return ErrEval
+		}
+		return ev.Define(prm.Name, arr, false)
+	}
+	return nil
+}
+
 func argObject(prm value.Parameter, obj value.Object, ev env.Environ[value.Value]) error {
 	switch a := prm.Value.(type) {
 	case ast.AssignNode:
 		prm.Value = a.Ident
 		return argObject(prm, obj, ev)
 	case ast.BindingObjectNode:
-		for k, n := range a.List {
-			v, err := obj.Get(k)
-			if err != nil || value.IsUndefined(v) || value.IsNull(v) {
-				a, ok := n.(ast.AssignNode)
-				if !ok {
-					return ErrEval
-				}
-				v, err = eval(a.Expr, ev)
-				if err != nil {
-					return err
-				}
-			}
-			if err = ev.Define(k, v, false); err != nil {
-				return err
-			}
-		}
+		return bindObject(a, obj, ev, false)
 	default:
 		if prm.Name == "" {
 			return ErrEval
 		}
 		return ev.Define(prm.Name, obj, false)
 	}
-	return nil
-}
-
-func argArray(prm value.Parameter, arr value.Array, ev env.Environ[value.Value]) error {
 	return nil
 }
 
