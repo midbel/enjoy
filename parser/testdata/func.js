@@ -1,3 +1,15 @@
+const arr_1 = []
+arr_1.map(x => 2 ** 2)
+arr_1.map(x => {
+  x <<= 7
+  return x
+})
+
+arr_1.map(x => ({
+  num: x,
+  label: `item-${x}`,
+}))
+
 function test() {
   return 0
 }

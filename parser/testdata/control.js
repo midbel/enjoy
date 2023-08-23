@@ -27,6 +27,8 @@ try {
   i / 0
 } catch(err) {
   throw err
+} finally {
+  console.log("run finalizer")
 }
 
 const arr = [100, 101, 200, true, false, "foo", "bar"]

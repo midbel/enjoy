@@ -191,7 +191,7 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 	}
 	var seq ast.SeqNode
 	for !p.done() && !p.is(token.Rparen) {
-		n, err := p.parseNode(powComma)
+		n, err := p.parseNode(powLowest)
 		if err != nil {
 			return nil, err
 		}
@@ -648,9 +648,9 @@ func (p *Parser) parseTry() (ast.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		if p.is(token.Keyword) && p.curr.Literal == "finally" {
-			node.Finally, err = p.parseKeyword()
-		}
+	}
+	if p.is(token.Keyword) && p.curr.Literal == "finally" {
+		node.Finally, err = p.parseKeyword()
 	}
 	return node, err
 }
