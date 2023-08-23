@@ -138,6 +138,7 @@ func (p *Parser) Parse() (ast.Node, error) {
 			p.next()
 		}
 		p.next()
+		p.scan.Reset()
 	}
 	return n, err
 }
@@ -498,52 +499,46 @@ func (p *Parser) parseCase() (ast.Node, error) {
 	return nil, nil
 }
 
-func (p *Parser) parseForeach() (ast.Node, error) {
-	p.next()
+func (p *Parser) parseForeach() (ast.Node, bool, error) {
+	n, err := p.parseNode(powLowest)
+	if err == nil {
+		return n, false, err
+	}
+	if !p.is(token.Assign) && !p.is(token.Keyword) {
+		return nil, false, err
+	}
 	var (
-		in    bool
-		ident string
-		expr  ast.Node
-		body  ast.Node
-		err   error
+		loop ast.LoopNode
+		kw   = p.curr.Literal
 	)
-	if !p.is(token.Ident) {
-		return nil, p.unexpected()
-	}
-	ident = p.curr.Literal
 	p.next()
-	if !p.is(token.Keyword) && p.curr.Literal != "in" && p.curr.Literal != "of" {
-		return nil, p.unexpected()
+	it, err := p.parseNode(powLowest)
+	if err != nil {
+		return nil, false, err
 	}
-	in = p.curr.Literal == "in"
-	p.next()
-	if expr, err = p.parseNode(powLowest); err != nil {
-		return nil, err
-	}
-	if err = p.expect(token.Rparen); err != nil {
-		return nil, err
-	}
-	if body, err = p.parseBody(); err != nil {
-		return nil, err
-	}
-	var node ast.Node
-	if in {
-		node = ast.ForInNode{
-			Ident: ident,
-			Expr:  expr,
-			Body:  body,
+	switch kw {
+	default:
+		return nil, false, p.unexpected()
+	case "of":
+		loop.Iter = ast.IterOfNode{
+			Ident: n,
+			Iter:  it,
 		}
-	} else {
-		node = ast.ForOfNode{
-			Ident: ident,
-			Expr:  expr,
-			Body:  body,
+	case "in":
+		loop.Iter = ast.IterInNode{
+			Ident: n,
+			Iter:  it,
 		}
 	}
-	return node, nil
+	if err := p.expect(token.Rparen); err != nil {
+		return nil, false, err
+	}
+	loop.Body, err = p.parseBody()
+	return loop, true, err
 }
 
 func (p *Parser) parseFor() (ast.Node, error) {
+	p.scan.ToggleKeepEOL()
 	p.next()
 	var (
 		node ast.ForNode
@@ -552,26 +547,25 @@ func (p *Parser) parseFor() (ast.Node, error) {
 	if err := p.expect(token.Lparen); err != nil {
 		return nil, err
 	}
-	if p.is(token.Keyword) && p.curr.Literal == "let" {
-		return p.parseForeach()
-	}
 	if !p.is(token.EOL) {
-		node.Init, err = p.parseNode(powLowest)
-		if err != nil {
-			return nil, err
+		n, done, err := p.parseForeach()
+		if err != nil || done {
+			p.scan.ToggleKeepEOL()
+			return n, err
 		}
-		if err = p.expect(token.EOL); err != nil {
-			return nil, err
-		}
+		node.Init = n
+	}
+	if err = p.expect(token.EOL); err != nil {
+		return nil, err
 	}
 	if !p.is(token.EOL) {
 		node.Cdt, err = p.parseNode(powLowest)
 		if err != nil {
 			return nil, err
 		}
-		if err = p.expect(token.EOL); err != nil {
-			return nil, err
-		}
+	}
+	if err = p.expect(token.EOL); err != nil {
+		return nil, err
 	}
 	if !p.is(token.Rparen) {
 		node.Incr, err = p.parseNode(powLowest)
@@ -582,6 +576,7 @@ func (p *Parser) parseFor() (ast.Node, error) {
 	if err := p.expect(token.Rparen); err != nil {
 		return nil, err
 	}
+	p.scan.ToggleKeepEOL()
 	node.Body, err = p.parseBody()
 	return node, err
 }

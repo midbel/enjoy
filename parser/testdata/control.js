@@ -30,7 +30,8 @@ try {
 }
 
 const arr = [100, 101, 200, true, false, "foo", "bar"]
-for (let i = 0; i < 100; i += 1) {
+let i
+for (i = 0; i < 100; i += 1) {
   console.log(i)
 }
 
@@ -43,6 +44,10 @@ for (; i < 100; i += 5) {
 }
 
 for (; i <= 100; ) {
+  console.log(i)
+}
+
+for (let i = 0; i < 100; i += 1) {
   console.log(i)
 }
 

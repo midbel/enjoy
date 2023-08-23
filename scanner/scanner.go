@@ -14,8 +14,9 @@ type Scanner struct {
 	cursor
 	old cursor
 
-	str  bytes.Buffer
-	mode scanMode
+	str        bytes.Buffer
+	mode       scanMode
+	keepAllEol bool
 }
 
 func Scan(r io.Reader) *Scanner {
@@ -29,6 +30,15 @@ func Scan(r io.Reader) *Scanner {
 	s.read()
 	s.skip(isBlank)
 	return &s
+}
+
+func (s *Scanner) Reset() {
+	s.mode = modeDefault
+	s.keepAllEol = false
+}
+
+func (s *Scanner) ToggleKeepEOL() {
+	s.keepAllEol = !s.keepAllEol
 }
 
 func (s *Scanner) Scan() token.Token {
@@ -151,8 +161,12 @@ func (s *Scanner) toggleTemplate(tok *token.Token) {
 }
 
 func (s *Scanner) scanEOL(tok *token.Token) {
-	s.skip(isEOL)
 	tok.Type = token.EOL
+	if s.char == semicolon && s.keepAllEol {
+		s.read()
+		return
+	}
+	s.skip(isEOL)
 }
 
 func (s *Scanner) scanComment(tok *token.Token) {

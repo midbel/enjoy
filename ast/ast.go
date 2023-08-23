@@ -208,16 +208,19 @@ type ForNode struct {
 	Body Node
 }
 
-type ForInNode struct {
-	Ident string
-	Expr  Node
-	Body  Node
+type IterInNode struct {
+	Ident Node
+	Iter  Node
 }
 
-type ForOfNode struct {
-	Ident string
-	Expr  Node
-	Body  Node
+type IterOfNode struct {
+	Ident Node
+	Iter  Node
+}
+
+type LoopNode struct {
+	Iter Node
+	Body Node
 }
 
 type FuncNode struct {
