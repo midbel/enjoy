@@ -596,6 +596,10 @@ func (p *Parser) parseDo() (ast.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !p.is(token.Keyword) && p.curr.Literal != "while" {
+		return nil, p.unexpected()
+	}
+	p.next()
 	node.Cdt, err = p.parseCondition()
 	return node, err
 }
