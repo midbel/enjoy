@@ -639,6 +639,7 @@ func (p *Parser) parseContinue() (ast.Node, error) {
 }
 
 func (p *Parser) parseTry() (ast.Node, error) {
+	p.next()
 	var (
 		node ast.TryNode
 		err  error
@@ -820,7 +821,7 @@ func (p *Parser) parseTernary(left ast.Node) (ast.Node, error) {
 	node := ast.IfNode{
 		Cdt: left,
 	}
-	csq, err := p.parseNode(powLowest)
+	csq, err := p.parseNode(powAssign)
 	if err != nil {
 		return nil, err
 	}
