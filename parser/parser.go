@@ -132,6 +132,17 @@ func NewParser(r io.Reader) *Parser {
 }
 
 func (p *Parser) Parse() (ast.Node, error) {
+	n, err := p.parse()
+	if err != nil {
+		for !p.is(token.EOL) {
+			p.next()
+		}
+		p.next()
+	}
+	return n, err
+}
+
+func (p *Parser) parse() (ast.Node, error) {
 	var b ast.BlockNode
 	for !p.done() {
 		p.skip(token.Comment)
