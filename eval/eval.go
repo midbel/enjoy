@@ -127,6 +127,8 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return evalDo(n, ev)
 	case ast.ForNode:
 		return evalFor(n, ev)
+	case ast.LoopNode:
+		return evalLoop(n, ev)
 	case ast.FuncNode:
 		return evalFunc(n, ev)
 	case ast.ArrowNode:

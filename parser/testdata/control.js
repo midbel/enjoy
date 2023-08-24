@@ -66,3 +66,11 @@ for (const prop in obj) {
 for (const el of arr) {
   console.log(el);
 }
+
+for (const { user, pass} of users) {
+  const weak = isWeakPassword(pass)
+  if (!weak) {
+    continue
+  }
+  console.log(`${user}: weak password ${pass}`)
+}

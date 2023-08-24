@@ -12,6 +12,26 @@ func evalLabel(n ast.LabelNode, ev env.Environ[value.Value]) (value.Value, error
 	return nil, nil
 }
 
+func evalLoop(n ast.LoopNode, ev env.Environ[value.Value]) (value.Value, error) {
+		switch n.Ident.(type) {
+		case ast.IterInNode:
+			return evalForIn(n, ev)
+		case ast.IterOfNode:
+			return evalForOf(n, ev)
+		default:
+			return nil, ErrEval
+		}
+}
+
+func evalForIn(n ast.LoopNode, ev env.Environ[value.Value]) (value.Value, error) {
+		return nil, nil
+}
+}
+
+func evalForOf(n ast.LoopNode, ev env.Environ[value.Value]) (value.Value, error) {
+		return nil, nil
+}
+
 func evalBlock(n ast.BlockNode, ev env.Environ[value.Value]) (value.Value, error) {
 	var (
 		res value.Value
