@@ -16,6 +16,14 @@ type (
 	infixFunc  func(ast.Node) (ast.Node, error)
 )
 
+func ParseString(str string) (ast.Node, error) {
+	return Parse(strings.NewReader(str))
+}
+
+func Parse(r io.Reader) (ast.Node, error) {
+	return NewParser(r).Parse()
+}
+
 type Parser struct {
 	prefix   map[rune]prefixFunc
 	infix    map[rune]infixFunc
@@ -24,14 +32,8 @@ type Parser struct {
 	scan *scanner.Scanner
 	curr token.Token
 	peek token.Token
-}
 
-func ParseString(str string) (ast.Node, error) {
-	return Parse(strings.NewReader(str))
-}
-
-func Parse(r io.Reader) (ast.Node, error) {
-	return NewParser(r).Parse()
+	allowDestructAssign int
 }
 
 func NewParser(r io.Reader) *Parser {
@@ -55,8 +57,8 @@ func NewParser(r io.Reader) *Parser {
 	p.registerPrefix(token.Increment, p.parseUnary)
 	p.registerPrefix(token.Decrement, p.parseUnary)
 	p.registerPrefix(token.Lparen, p.parseGroup)
-	p.registerPrefix(token.Lbrace, p.parseObject)
-	p.registerPrefix(token.Lsquare, p.parseArray)
+	p.registerPrefix(token.Lbrace, p.parseBrace)
+	p.registerPrefix(token.Lsquare, p.parseSquare)
 	p.registerPrefix(token.Spread, p.parseSpread)
 
 	p.registerInfix(token.Eq, p.parseBinary)
@@ -103,7 +105,6 @@ func NewParser(r io.Reader) *Parser {
 	p.registerInfix(token.Dot, p.parseMember)
 	p.registerInfix(token.Optional, p.parseMember)
 	p.registerInfix(token.Keyword, p.parseOperatorKeyword)
-	// p.registerInfix(token.Comma, p.parseSequence)
 
 	p.registerKeyword("let", p.parseLet)
 	p.registerKeyword("const", p.parseConst)
@@ -134,10 +135,7 @@ func NewParser(r io.Reader) *Parser {
 func (p *Parser) Parse() (ast.Node, error) {
 	n, err := p.parse()
 	if err != nil {
-		for !p.is(token.EOL) && !p.done() {
-			p.next()
-		}
-		p.scan.Reset()
+		p.reset()
 	}
 	return n, err
 }
@@ -210,8 +208,8 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 }
 
 func (p *Parser) parseLet() (ast.Node, error) {
-	p.enterBinding()
-	defer p.leaveBinding()
+	p.enableDestructuring()
+	defer p.disableDestructuring()
 
 	p.next()
 	ident, err := p.parseNode(powUnary)
@@ -228,7 +226,7 @@ func (p *Parser) parseLet() (ast.Node, error) {
 	if err := p.expect(token.Assign); err != nil {
 		return nil, err
 	}
-	expr, err := p.parseNodeInBinding(powLowest)
+	expr, err := p.parseNode(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +235,8 @@ func (p *Parser) parseLet() (ast.Node, error) {
 }
 
 func (p *Parser) parseConst() (ast.Node, error) {
-	p.enterBinding()
-	defer p.leaveBinding()
+	p.enableDestructuring()
+	defer p.disableDestructuring()
 
 	p.next()
 	ident, err := p.parseNode(powUnary)
@@ -250,7 +248,7 @@ func (p *Parser) parseConst() (ast.Node, error) {
 		return nil, err
 	}
 
-	expr, err := p.parseNodeInBinding(powLowest)
+	expr, err := p.parseNode(powLowest)
 	if err != nil {
 		return nil, err
 	}
@@ -258,20 +256,48 @@ func (p *Parser) parseConst() (ast.Node, error) {
 	return node, nil
 }
 
-func (p *Parser) enterBinding() {
-	p.registerPrefix(token.Lbrace, p.parseObjectBinding)
-	p.registerPrefix(token.Lsquare, p.parseArrayBinding)
+func (p *Parser) parseBrace() (ast.Node, error) {
+	if p.isDestructuringAllowed() {
+		return p.parseObjectBinding()
+	}
+	return p.parseObject()
 }
 
-func (p *Parser) leaveBinding() {
-	p.registerPrefix(token.Lbrace, p.parseObject)
-	p.registerPrefix(token.Lsquare, p.parseArray)
-}
-
-func (p *Parser) parseNodeInBinding(pow int) (ast.Node, error) {
-	p.leaveBinding()
-	defer p.enterBinding()
-	return p.parseNode(pow)
+func (p *Parser) parseObject() (ast.Node, error) {
+	if err := p.expect(token.Lbrace); err != nil {
+		return nil, err
+	}
+	list := make(map[string]ast.Node)
+	for !p.done() && !p.is(token.Rbrace) {
+		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
+			return nil, p.unexpected()
+		}
+		ident := p.curr.Literal
+		p.next()
+		if p.is(token.Comma) || p.is(token.Rbrace) {
+			list[ident] = ast.CreateVar(ident)
+			if p.is(token.Comma) {
+				p.next()
+			}
+			continue
+		}
+		if err := p.expect(token.Colon); err != nil {
+			return nil, err
+		}
+		node, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		list[ident] = node
+		switch {
+		case p.is(token.Comma):
+			p.next()
+		case p.is(token.Rbrace):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return ast.Object(list), p.expect(token.Rbrace)
 }
 
 func (p *Parser) parseObjectBinding() (ast.Node, error) {
@@ -320,7 +346,7 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 		}
 		if p.is(token.Assign) {
 			p.next()
-			value.Expr, err = p.parseNodeInBinding(powComma)
+			value.Expr, err = p.parseNode(powComma)
 			if err != nil {
 				return nil, err
 			}
@@ -335,6 +361,40 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 		}
 	}
 	return ast.BindObject(list), p.expect(token.Rbrace)
+}
+
+func (p *Parser) parseSquare() (ast.Node, error) {
+	if p.isDestructuringAllowed() {
+		return p.parseArrayBinding()
+	}
+	return p.parseArray()
+}
+
+func (p *Parser) parseArray() (ast.Node, error) {
+	if err := p.expect(token.Lsquare); err != nil {
+		return nil, err
+	}
+	var list []ast.Node
+	for !p.done() && !p.is(token.Rsquare) {
+		if p.is(token.Comma) {
+			p.next()
+			list = append(list, ast.Discard())
+			continue
+		}
+		n, err := p.parseNode(powComma)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, n)
+		switch {
+		case p.is(token.Comma):
+			p.next()
+		case p.is(token.Rsquare):
+		default:
+			return nil, p.unexpected()
+		}
+	}
+	return ast.Array(list), p.expect(token.Rsquare)
 }
 
 func (p *Parser) parseArrayBinding() (ast.Node, error) {
@@ -381,7 +441,7 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 		if _, ok := node.(ast.SpreadNode); !ok && p.is(token.Assign) {
 			ass := makeAssignNode(node)
 			p.next()
-			ass.Expr, err = p.parseNodeInBinding(powComma)
+			ass.Expr, err = p.parseNode(powComma)
 			node = ass
 		}
 		list = append(list, node)
@@ -682,11 +742,12 @@ func (p *Parser) parseFunction() (ast.Node, error) {
 }
 
 func (p *Parser) parseArgs() (ast.Node, error) {
+	p.enableDestructuring()
+	defer p.disableDestructuring()
+
 	if err := p.expect(token.Lparen); err != nil {
 		return nil, err
 	}
-	p.enterBinding()
-	defer p.leaveBinding()
 
 	var seq ast.SeqNode
 	for !p.done() && !p.is(token.Rparen) {
@@ -742,6 +803,11 @@ func (p *Parser) parseAssign(left ast.Node) (ast.Node, error) {
 		op   = p.curr.Type
 	)
 	p.next()
+
+	if p.isDestructuringAllowed() {
+		p.disableDestructuring()
+		defer p.enableDestructuring()
+	}
 
 	expr, err := p.parseNode(powAssign)
 	if err != nil {
@@ -924,78 +990,10 @@ func (p *Parser) parseTemplate() (ast.Node, error) {
 	return node, p.expect(token.Template)
 }
 
-func (p *Parser) parseObject() (ast.Node, error) {
-	if err := p.expect(token.Lbrace); err != nil {
-		return nil, err
-	}
-	list := make(map[string]ast.Node)
-	for !p.done() && !p.is(token.Rbrace) {
-		if !p.is(token.Ident) && !p.is(token.String) && !p.is(token.Number) && !p.is(token.Boolean) {
-			return nil, p.unexpected()
-		}
-		ident := p.curr.Literal
-		p.next()
-		if p.is(token.Comma) || p.is(token.Rbrace) {
-			list[ident] = ast.CreateVar(ident)
-			if p.is(token.Comma) {
-				p.next()
-			}
-			continue
-		}
-		if err := p.expect(token.Colon); err != nil {
-			return nil, err
-		}
-		node, err := p.parseNode(powComma)
-		if err != nil {
-			return nil, err
-		}
-		list[ident] = node
-		switch {
-		case p.is(token.Comma):
-			p.next()
-		case p.is(token.Rbrace):
-		default:
-			return nil, p.unexpected()
-		}
-	}
-	return ast.Object(list), p.expect(token.Rbrace)
-}
-
-func (p *Parser) parseArray() (ast.Node, error) {
-	if err := p.expect(token.Lsquare); err != nil {
-		return nil, err
-	}
-	var list []ast.Node
-	for !p.done() && !p.is(token.Rsquare) {
-		if p.is(token.Comma) {
-			p.next()
-			list = append(list, ast.Discard())
-			continue
-		}
-		n, err := p.parseNode(powComma)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, n)
-		switch {
-		case p.is(token.Comma):
-			p.next()
-		case p.is(token.Rsquare):
-		default:
-			return nil, p.unexpected()
-		}
-	}
-	return ast.Array(list), p.expect(token.Rsquare)
-}
-
 func (p *Parser) parseSpread() (ast.Node, error) {
 	p.next()
-	var (
-		node ast.SpreadNode
-		err  error
-	)
-	node.Node, err = p.parseNode(powAssign)
-	return node, err
+	node, err := p.parseNode(powAssign)
+	return makeSpreadFrom(node), err
 }
 
 func (p *Parser) parseBody() (ast.Node, error) {
@@ -1030,6 +1028,30 @@ func (p *Parser) parseCondition() (ast.Node, error) {
 		return nil, err
 	}
 	return expr, p.expect(token.Rparen)
+}
+
+func (p *Parser) reset() {
+	for !p.is(token.EOL) && !p.done() {
+		p.next()
+	}
+	p.scan.Reset()
+	p.resetDestructuring()
+}
+
+func (p *Parser) isDestructuringAllowed() bool {
+	return p.allowDestructAssign > 0
+}
+
+func (p *Parser) enableDestructuring() {
+	p.allowDestructAssign++
+}
+
+func (p *Parser) disableDestructuring() {
+	p.allowDestructAssign--
+}
+
+func (p *Parser) resetDestructuring() {
+	p.allowDestructAssign = 0
 }
 
 func (p *Parser) registerPrefix(kind rune, fn prefixFunc) {
