@@ -1,5 +1,9 @@
 package token
 
+import (
+	"fmt"
+)
+
 const (
 	EOF rune = -(iota + 1)
 	EOL
@@ -69,6 +73,43 @@ const (
 	Spread
 	Invalid
 )
+
+func ConvertAssignToken(op rune) (rune, error) {
+	switch op {
+	default:
+		return -1, fmt.Errorf("invalid assignment token")
+	case Assign:
+	case AddAssign:
+		op = Add
+	case SubAssign:
+		op = Sub
+	case MulAssign:
+		op = Mul
+	case DivAssign:
+		op = Div
+	case PowAssign:
+		op = Pow
+	case ModAssign:
+		op = Mod
+	case NullishAssign:
+		op = Nullish
+	case AndAssign:
+		op = And
+	case OrAssign:
+		op = Or
+	case LshiftAssign:
+		op = Lshift
+	case RshiftAssign:
+		op = Rshift
+	case BandAssign:
+		op = Band
+	case BorAssign:
+		op = Bor
+	case BxorAssign:
+		op = Bxor
+	}
+	return op, nil
+}
 
 func CanSkipBlanks(k rune) bool {
 	switch k {

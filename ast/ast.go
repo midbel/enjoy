@@ -92,16 +92,20 @@ type BreakNode struct {
 	Label string
 }
 
-func Break() BreakNode {
-	return BreakNode{}
+func Break(str string) BreakNode {
+	return BreakNode{
+		Label: str,
+	}
 }
 
 type ContinueNode struct {
 	Label string
 }
 
-func Continue() ContinueNode {
-	return ContinueNode{}
+func Continue(str string) ContinueNode {
+	return ContinueNode{
+		Label: str,
+	}
 }
 
 type MemberNode struct {

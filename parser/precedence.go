@@ -70,7 +70,7 @@ var powers = powerSet{
 	token.Mul:           powMul,
 	token.Div:           powMul,
 	token.Mod:           powMul,
-	token.Pow:           powMul,
+	token.Pow:           powPow,
 	token.Dot:           powObject,
 	token.Optional:      powObject,
 	token.Lparen:        powObject,

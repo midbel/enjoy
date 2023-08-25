@@ -137,7 +137,6 @@ func (p *Parser) Parse() (ast.Node, error) {
 		for !p.is(token.EOL) && !p.done() {
 			p.next()
 		}
-		p.next()
 		p.scan.Reset()
 	}
 	return n, err
@@ -219,10 +218,7 @@ func (p *Parser) parseLet() (ast.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	node := ast.LetNode{
-		Ident: ident,
-	}
-
+	node := makeLet(ident)
 	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
 		if !ok {
 			return nil, p.unexpected()
@@ -249,9 +245,7 @@ func (p *Parser) parseConst() (ast.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	node := ast.ConstNode{
-		Ident: ident,
-	}
+	node := makeConst(ident)
 	if err := p.expect(token.Assign); err != nil {
 		return nil, err
 	}
@@ -291,9 +285,7 @@ func (p *Parser) parseObjectBinding() (ast.Node, error) {
 			if !p.is(token.Ident) {
 				return nil, p.unexpected()
 			}
-			list[p.curr.Literal] = ast.SpreadNode{
-				Node: ast.CreateVar(p.curr.Literal),
-			}
+			list[p.curr.Literal] = makeSpreadWithVar(p.curr.Literal)
 			p.next()
 			if !p.is(token.Rbrace) {
 				return nil, p.unexpected()
@@ -372,16 +364,12 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 		case p.is(token.Spread):
 			p.next()
 			if p.is(token.Ident) {
-				node = ast.SpreadNode{
-					Node: ast.CreateVar(p.curr.Literal),
-				}
+				node = makeSpreadWithVar(p.curr.Literal)
 				p.next()
 			} else {
 				node, err = p.parseArrayBinding()
 				if err == nil {
-					node = ast.SpreadNode{
-						Node: node,
-					}
+					node = makeSpreadFrom(node)
 				}
 			}
 		default:
@@ -391,9 +379,7 @@ func (p *Parser) parseArrayBinding() (ast.Node, error) {
 			return nil, err
 		}
 		if _, ok := node.(ast.SpreadNode); !ok && p.is(token.Assign) {
-			ass := ast.AssignNode{
-				Ident: node,
-			}
+			ass := makeAssignNode(node)
 			p.next()
 			ass.Expr, err = p.parseNodeInBinding(powComma)
 			node = ass
@@ -520,15 +506,9 @@ func (p *Parser) parseForeach() (ast.Node, bool, error) {
 	default:
 		return nil, false, p.unexpected()
 	case "of":
-		loop.Iter = ast.IterOfNode{
-			Ident: n,
-			Iter:  it,
-		}
+		loop.Iter = makeIterOf(n, it)
 	case "in":
-		loop.Iter = ast.IterInNode{
-			Ident: n,
-			Iter:  it,
-		}
+		loop.Iter = makeIterIn(n, it)
 	}
 	if err := p.expect(token.Rparen); err != nil {
 		return nil, false, err
@@ -615,22 +595,22 @@ func (p *Parser) parseWhile() (ast.Node, error) {
 
 func (p *Parser) parseBreak() (ast.Node, error) {
 	p.next()
-	node := ast.Break()
+	var label string
 	if p.is(token.Ident) {
-		node.Label = p.curr.Literal
+		label = p.curr.Literal
 		p.next()
 	}
-	return node, nil
+	return ast.Break(label), nil
 }
 
 func (p *Parser) parseContinue() (ast.Node, error) {
 	p.next()
-	node := ast.Continue()
+	var label string
 	if p.is(token.Ident) {
-		node.Label = p.curr.Literal
+		label = p.curr.Literal
 		p.next()
 	}
-	return node, nil
+	return ast.Continue(label), nil
 }
 
 func (p *Parser) parseTry() (ast.Node, error) {
@@ -757,48 +737,19 @@ func (p *Parser) parseBinary(left ast.Node) (ast.Node, error) {
 }
 
 func (p *Parser) parseAssign(left ast.Node) (ast.Node, error) {
-	node := ast.AssignNode{
-		Ident: left,
-	}
-	op := p.curr.Type
+	var (
+		node = makeAssignNode(left)
+		op   = p.curr.Type
+	)
 	p.next()
 
-	expr, err := p.parseNodeInBinding(powAssign)
+	expr, err := p.parseNode(powAssign)
 	if err != nil {
 		return nil, err
 	}
-	switch op {
-	default:
-		return nil, p.unexpected()
-	case token.Assign:
-	case token.AddAssign:
-		op = token.Add
-	case token.SubAssign:
-		op = token.Sub
-	case token.MulAssign:
-		op = token.Mul
-	case token.DivAssign:
-		op = token.Div
-	case token.PowAssign:
-		op = token.Pow
-	case token.ModAssign:
-		op = token.Mod
-	case token.NullishAssign:
-		op = token.Nullish
-	case token.AndAssign:
-		op = token.And
-	case token.OrAssign:
-		op = token.Or
-	case token.LshiftAssign:
-		op = token.Lshift
-	case token.RshiftAssign:
-		op = token.Rshift
-	case token.BandAssign:
-		op = token.Band
-	case token.BorAssign:
-		op = token.Bor
-	case token.BxorAssign:
-		op = token.Bxor
+	op, err = token.ConvertAssignToken(op)
+	if err != nil {
+		return nil, err
 	}
 	if op != token.Assign {
 		expr = ast.BinaryNode{
@@ -848,9 +799,7 @@ func (p *Parser) parseIndex(left ast.Node) (ast.Node, error) {
 }
 
 func (p *Parser) parseCall(left ast.Node) (ast.Node, error) {
-	call := ast.CallNode{
-		Ident: left,
-	}
+	call := makeCall(left)
 	args, err := p.parseGroup()
 	if err != nil {
 		return nil, err
