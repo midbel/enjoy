@@ -516,6 +516,7 @@ func (s *Scanner) read() {
 		return
 	}
 	s.old.Position = s.cursor.Position
+	s.old = s.cursor
 	if r == nl {
 		s.cursor.Line++
 		s.cursor.Column = 0
@@ -525,8 +526,7 @@ func (s *Scanner) read() {
 }
 
 func (s *Scanner) unread() {
-	c, z := utf8.DecodeRune(s.input[s.curr:])
-	s.char, s.curr, s.next = c, s.curr-z, s.curr
+	s.cursor = s.old
 }
 
 func (s *Scanner) peek() rune {
