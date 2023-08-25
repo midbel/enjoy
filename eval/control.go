@@ -13,7 +13,7 @@ func evalLabel(n ast.LabelNode, ev env.Environ[value.Value]) (value.Value, error
 }
 
 func evalLoop(n ast.LoopNode, ev env.Environ[value.Value]) (value.Value, error) {
-	switch n.Ident.(type) {
+	switch n.Iter.(type) {
 	case ast.IterInNode:
 		return evalForIn(n, ev)
 	case ast.IterOfNode:

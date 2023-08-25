@@ -80,7 +80,8 @@ func scanFile(r io.Reader) error {
 		if tok.Type == token.EOF {
 			break
 		}
-		fmt.Println(tok)
+		fmt.Printf("%d,%d: %s", tok.Line, tok.Column, tok)
+		fmt.Println()
 	}
 	return nil
 }
