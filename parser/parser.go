@@ -134,7 +134,7 @@ func NewParser(r io.Reader) *Parser {
 func (p *Parser) Parse() (ast.Node, error) {
 	n, err := p.parse()
 	if err != nil {
-		for !p.is(token.EOL) {
+		for !p.is(token.EOL) && !p.done() {
 			p.next()
 		}
 		p.next()
@@ -191,7 +191,7 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 	}
 	var seq ast.SeqNode
 	for !p.done() && !p.is(token.Rparen) {
-		n, err := p.parseNode(powLowest)
+		n, err := p.parseNode(powComma)
 		if err != nil {
 			return nil, err
 		}
@@ -868,7 +868,11 @@ func (p *Parser) parseArrow(left ast.Node) (ast.Node, error) {
 	p.next()
 	switch {
 	case p.is(token.Lparen):
-		fn.Body, err = p.parseGroup()
+		p.next()
+		fn.Body, err = p.parseObject()
+		if err == nil {
+			err = p.expect(token.Rparen)
+		}
 	case p.is(token.Lbrace):
 		fn.Body, err = p.parseBody()
 	default:

@@ -27,6 +27,16 @@ func parseFile(t *testing.T, file string) {
 
 	_, err = Parse(r)
 	if err != nil {
-		t.Errorf("fail to parse file %s: %s", file, err)
+		t.Errorf("error parsing file %s: %s", file, err)
 	}
+	// p := NewParser(r)
+	// for i := 0; ; i++ {
+	// 	_, err := p.Parse()
+	// 	if err != nil {
+	// 		t.Errorf("error parsing file %s: %s", file, err)
+	// 		if i > 10 {
+	// 			t.Errorf("too many error parsing file %s! abort...", file)
+	// 		}
+	// 	}
+	// }
 }

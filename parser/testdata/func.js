@@ -10,6 +10,10 @@ arr_1.map(x => ({
   label: `item-${x}`,
 }))
 
+arrow = (x1, y1, ...rest) => 42
+
+arrow = (a = 42, b) => a
+
 function test() {
   return 0
 }
