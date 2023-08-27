@@ -472,13 +472,33 @@ func (p *Parser) parseOperatorKeyword(left ast.Node) (ast.Node, error) {
 }
 
 func (p *Parser) parseIn(left ast.Node) (ast.Node, error) {
-	p.next()
-	return left, nil
+	if err := p.expect(token.Keyword); err != nil {
+		return nil, err
+	}
+	var (
+		err  error
+		node ast.InNode
+	)
+	node = ast.InNode{
+		Left: left,
+	}
+	node.Right, err = p.parseNode(powLowest)
+	return node, err
 }
 
 func (p *Parser) parseInstanceOf(left ast.Node) (ast.Node, error) {
-	p.next()
-	return left, nil
+	if err := p.expect(token.Keyword); err != nil {
+		return nil, err
+	}
+	var (
+		err  error
+		node ast.InstanceOfNode
+	)
+	node = ast.InstanceOfNode{
+		Left: left,
+	}
+	node.Right, err = p.parseNode(powLowest)
+	return node, err
 }
 
 func (p *Parser) parseTypeOf() (ast.Node, error) {
@@ -529,11 +549,78 @@ func (p *Parser) parseSwitch() (ast.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return node, err
+	if err = p.expect(token.Lbrace); err != nil {
+		return nil, err
+	}
+	for !p.done() && !p.is(token.Rbrace)  {
+		if !p.is(token.Keyword) {
+			return nil, p.unexpected()
+		}
+		if p.curr.Literal == "default" {
+			break
+		}
+		if p.curr.Literal != "case" {
+			return nil, p.unexpected()
+		}
+		b, err := p.parseCase()
+		if err != nil {
+			return nil, err
+		}
+		node.Cases = append(node.Cases, b)
+	}
+	if p.is(token.Keyword) && p.curr.Literal == "default" {
+		node.Default, err = p.parseDefault()
+		return node, err
+	}
+	return node, p.expect(token.Rbrace)
+}
+
+func (p *Parser) parseDefault() (ast.Node, error) {
+	p.next()
+	if err := p.expect(token.Colon); err != nil {
+		return nil, err
+	}
+	var nodes []ast.Node
+	p.skip(token.EOL)
+	for !p.done() && !p.is(token.Rbrace) {
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		p.skip(token.EOL)
+		nodes = append(nodes, n)
+	}
+	return blockOrNode(nodes), p.expect(token.Rbrace)
 }
 
 func (p *Parser) parseCase() (ast.Node, error) {
-	return nil, nil
+	p.next()
+	var (
+		clause ast.CaseNode
+		err error
+	)
+	clause.Predicate, err = p.parseNode(powAssign)
+	if err != nil {
+		return nil, err
+	}
+	if err = p.expect(token.Colon); err != nil {
+		return nil, err
+	}
+	var nodes []ast.Node
+	p.skip(token.EOL)
+	for !p.done() && !p.is(token.Rbrace) {
+		if p.is(token.Keyword) && (p.curr.Literal == "case" || p.curr.Literal == "default") {
+			break
+		}
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		p.skip(token.EOL)
+		nodes = append(nodes, n)
+	}
+	clause.Body = blockOrNode(nodes)
+	return clause, nil
 }
 
 func (p *Parser) parseForeach() (ast.Node, bool, error) {

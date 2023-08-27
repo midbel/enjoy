@@ -76,6 +76,16 @@ type TemplateNode struct {
 	Nodes []Node
 }
 
+type InNode struct {
+	Left  Node
+	Right Node
+}
+
+type InstanceOfNode struct {
+	Left  Node
+	Right Node
+}
+
 type SeqNode struct {
 	Nodes []Node
 }
@@ -186,12 +196,13 @@ type IfNode struct {
 }
 
 type SwitchNode struct {
-	Cdt   Node
-	Cases []Node
+	Cdt     Node
+	Cases   []Node
+	Default Node
 }
 
 type CaseNode struct {
-	Cdt  Node
+	Predicate  Node
 	Body Node
 }
 
@@ -249,14 +260,4 @@ type CallNode struct {
 
 type TypeofNode struct {
 	Node
-}
-
-type InNode struct {
-	Left  Node
-	Right Node
-}
-
-type InstanceOf struct {
-	Left  Node
-	Right Node
 }

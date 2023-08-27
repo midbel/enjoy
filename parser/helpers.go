@@ -51,3 +51,12 @@ func makeCall(id ast.Node) ast.CallNode {
 		Ident: id,
 	}
 }
+
+func blockOrNode(nodes []ast.Node) ast.Node {
+	if len(nodes) == 1 {
+		return nodes[0]
+	}
+	return ast.BlockNode{
+		Nodes: nodes,
+	}
+}
