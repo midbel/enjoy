@@ -747,7 +747,7 @@ func (p *Parser) parseArgs() (ast.Node, error) {
 			return nil, err
 		}
 		seq.Nodes = append(seq.Nodes, n)
-		if _, ok := n.(ast.SpreadNode); ok && !p.is(token.Rbrace) {
+		if _, ok := n.(ast.SpreadNode); ok && !p.is(token.Rparen) {
 			return nil, p.unexpected()
 		}
 		switch {
