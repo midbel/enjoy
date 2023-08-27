@@ -207,53 +207,44 @@ func (p *Parser) parseGroup() (ast.Node, error) {
 	return seq, p.expect(token.Rparen)
 }
 
-func (p *Parser) parseLet() (ast.Node, error) {
+func (p *Parser) parseBinding(let bool) (ast.Node, bool, error) {
 	p.enableDestructuring()
 	defer p.disableDestructuring()
 
 	p.next()
-	ident, err := p.parseNode(powUnary)
+	node, err := p.parseNode(powAssign)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	node := makeLet(ident)
-	if _, ok := ident.(ast.VarNode); p.is(token.EOL) {
-		if !ok {
-			return nil, p.unexpected()
+	if let {
+		if _, ok := node.(ast.VarNode); p.is(token.EOL) {
+			if !ok {
+				return nil, false, p.unexpected()
+			}
+			return node, true, p.expect(token.EOL)
 		}
-		return node, nil
 	}
-	if err := p.expect(token.Assign); err != nil {
-		return nil, err
+	return node, false, p.expect(token.Assign)
+}
+
+func (p *Parser) parseLet() (ast.Node, error) {
+	node, done, err := p.parseBinding(true)
+	if err != nil || done {
+		return makeLet(node), err
 	}
-	expr, err := p.parseNode(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	node.Expr = expr
-	return node, nil
+	bind := makeLet(node)
+	bind.Expr, err = p.parseNode(powLowest)
+	return bind, err
 }
 
 func (p *Parser) parseConst() (ast.Node, error) {
-	p.enableDestructuring()
-	defer p.disableDestructuring()
-
-	p.next()
-	ident, err := p.parseNode(powUnary)
+	node, _, err := p.parseBinding(false)
 	if err != nil {
 		return nil, err
 	}
-	node := makeConst(ident)
-	if err := p.expect(token.Assign); err != nil {
-		return nil, err
-	}
-
-	expr, err := p.parseNode(powLowest)
-	if err != nil {
-		return nil, err
-	}
-	node.Expr = expr
-	return node, nil
+	bind := makeConst(node)
+	bind.Expr, err = p.parseNode(powLowest)
+	return bind, err
 }
 
 func (p *Parser) parseBrace() (ast.Node, error) {
