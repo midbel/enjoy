@@ -203,15 +203,81 @@ func arrayFill(a Array, args []Value) (Value, error) {
 }
 
 func arrayFilter(a Array, args []Value) (Value, error) {
-	return nil, nil
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var (
+		list  []Value
+		ident string
+	)
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		v, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+		if v.True() {
+			list = append(list, a.values[i])
+		}
+	}
+	return CreateArray(list), nil
 }
 
 func arrayFind(a Array, args []Value) (Value, error) {
-	return nil, nil
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var ident string
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		v, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+		if v.True() {
+			return a.values[i], nil
+		}
+	}
+	return Undefined(), nil
 }
 
 func arrayFindIndex(a Array, args []Value) (Value, error) {
-	return nil, nil
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var ident string
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		v, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+		if v.True() {
+			return CreateFloat(float64(i)), nil
+		}
+	}
+	return CreateFloat(-1), nil
 }
 
 func arrayFindLast(a Array, args []Value) (Value, error) {

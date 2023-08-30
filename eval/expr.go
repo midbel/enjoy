@@ -31,7 +31,7 @@ func evalBinary(n ast.BinaryNode, ev env.Environ[value.Value]) (value.Value, err
 	case token.Div:
 		return divValues(left, right)
 	case token.Mod:
-		return divValues(left, right)
+		return modValues(left, right)
 	case token.Pow:
 		return powValues(left, right)
 	case token.Lshift:
