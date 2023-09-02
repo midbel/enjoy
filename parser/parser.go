@@ -126,6 +126,8 @@ func NewParser(r io.Reader) *Parser {
 	p.registerKeyword("null", p.parseNull)
 	p.registerKeyword("undefined", p.parseUndefined)
 	p.registerKeyword("typeof", p.parseTypeOf)
+	p.registerKeyword("export", p.parseExport)
+	p.registerKeyword("import", p.parseImport)
 
 	p.next()
 	p.next()
@@ -521,10 +523,11 @@ func (p *Parser) parseExport() (ast.Node, error) {
 	}
 	node, err := p.parseNode(powLowest)
 	if err == nil {
-		node = ast.Export(node)
-		node.Default = def
+		e := ast.Export(node)
+		e.Default = def
+		node = e
 	}
-	return node
+	return node, nil
 }
 
 func (p *Parser) parseExportFrom() (ast.Node, error) {
@@ -533,7 +536,125 @@ func (p *Parser) parseExportFrom() (ast.Node, error) {
 }
 
 func (p *Parser) parseImport() (ast.Node, error) {
-	return nil, nil
+	parseFrom := func() (string, error) {
+		p.next()
+		if err := p.expectKW("from"); err != nil {
+			return "", err
+		}
+		if !p.is(token.String) {
+			return "", p.unexpected()
+		}
+		defer p.next()
+		return p.curr.Literal, nil
+	}
+
+	parseStar := func(prev ast.Node) (ast.Node, error) {
+		p.next()
+		err := p.expectKW("as")
+		if err != nil {
+			return nil, err
+		}
+		var (
+			ident = ast.CreateVar(p.curr.Literal)
+			file  string
+		)
+		if file, err = parseFrom(); err != nil {
+			return nil, err
+		}
+		n := ast.Import(ident, file)
+		n.Default = prev
+		return n, nil
+	}
+
+	parseList := func(prev ast.Node) (ast.Node, error) {
+		p.next()
+		var (
+			list    []ast.Node
+			seendef bool
+		)
+		for !p.done() && !p.is(token.Rbrace) {
+			switch {
+			case p.is(token.Ident):
+			case p.is(token.String):
+			case p.is(token.Keyword) && p.curr.Literal == "default":
+				if seendef {
+					return nil, p.unexpected()
+				}
+				seendef = true
+			default:
+				return nil, p.unexpected()
+			}
+			var (
+				ident = p.curr.Literal
+				alias string
+			)
+			p.next()
+			if p.is(token.Keyword) && p.curr.Literal == "as" {
+				p.next()
+				if !p.is(token.Ident) && !p.is(token.String) {
+					return nil, p.unexpected()
+				}
+				alias = p.curr.Literal
+				p.next()
+			}
+			if ident == "default" && alias == "" {
+				return nil, fmt.Errorf("missing alias")
+			}
+			list = append(list, ast.Alias(ident, alias))
+			switch {
+			case p.is(token.Comma):
+				p.next()
+				if p.is(token.Rbrace) {
+					return nil, p.unexpected()
+				}
+			case p.is(token.Rbrace):
+			default:
+				return nil, p.unexpected()
+			}
+		}
+		if !p.is(token.Rbrace) {
+			return nil, p.unexpected()
+		}
+		file, err := parseFrom()
+		if err != nil {
+			return nil, err
+		}
+		n := ast.Import(ast.Sequence(list), file)
+		n.Default = prev
+		return n, nil
+	}
+
+	p.next()
+	if p.is(token.String) {
+		defer p.next()
+		return ast.Import(nil, p.curr.Literal), nil
+	}
+
+	if p.is(token.Mul) {
+		return parseStar(nil)
+	}
+
+	if p.is(token.Ident) {
+		ident := ast.CreateVar(p.curr.Literal)
+		if file, err := parseFrom(); err == nil {
+			return ast.Import(ident, file), nil
+		}
+		if err := p.expect(token.Comma); err != nil {
+			return nil, err
+		}
+		if p.is(token.Mul) {
+			return parseStar(ident)
+		}
+		if p.is(token.Lbrace) {
+			return parseList(ident)
+		}
+		return nil, p.unexpected()
+	}
+
+	if p.is(token.Lbrace) {
+		return parseList(nil)
+	}
+	return nil, p.unexpected()
 }
 
 func (p *Parser) parseIf() (ast.Node, error) {
@@ -1177,6 +1298,17 @@ func (p *Parser) skip(kind rune) {
 
 func (p *Parser) power() int {
 	return powers.Get(p.curr.Type)
+}
+
+func (p *Parser) expectKW(kw string) error {
+	if !p.is(token.Keyword) {
+		return p.unexpected()
+	}
+	if p.curr.Literal == kw {
+		p.next()
+		return nil
+	}
+	return p.unexpected()
 }
 
 func (p *Parser) expect(kind rune) error {

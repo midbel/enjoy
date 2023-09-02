@@ -72,14 +72,28 @@ func ExportFrom(n Node) ExportFromNode {
 	return x
 }
 
-type ImportNode struct {
-	Node
-	From string
+type AliasNode struct {
+	Name  string
+	Alias string
 }
 
-func Import(n Node) ImportNode {
+func Alias(name, alias string) Node {
+	return AliasNode{
+		Name:  name,
+		Alias: alias,
+	}
+}
+
+type ImportNode struct {
+	Node
+	Default Node
+	From    string
+}
+
+func Import(n Node, file string) ImportNode {
 	return ImportNode{
 		Node: n,
+		From: file,
 	}
 }
 
@@ -125,6 +139,12 @@ type InstanceOfNode struct {
 
 type SeqNode struct {
 	Nodes []Node
+}
+
+func Sequence(list []Node) SeqNode {
+	return SeqNode{
+		Nodes: list,
+	}
 }
 
 type SpreadNode struct {
