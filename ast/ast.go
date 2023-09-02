@@ -46,6 +46,43 @@ func Object(list map[string]Node) ObjectNode {
 	}
 }
 
+type ExportNode struct {
+	Node
+	Default bool
+}
+
+func Export(n Node) ExportNode {
+	return ExportNode{
+		Node: n,
+	}
+}
+
+type ExportFromNode struct {
+	ExportNode
+	From string
+}
+
+func ExportFrom(n Node) ExportFromNode {
+	var x ExportFromNode
+	if e, ok := n.(ExportNode); ok {
+		x.ExportNode = e
+	} else {
+		x.ExportNode = Export(n)
+	}
+	return x
+}
+
+type ImportNode struct {
+	Node
+	From string
+}
+
+func Import(n Node) ImportNode {
+	return ImportNode{
+		Node: n,
+	}
+}
+
 type LabelNode struct {
 	Ident string
 }
@@ -202,8 +239,8 @@ type SwitchNode struct {
 }
 
 type CaseNode struct {
-	Predicate  Node
-	Body Node
+	Predicate Node
+	Body      Node
 }
 
 type WhileNode struct {

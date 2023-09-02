@@ -511,6 +511,31 @@ func (p *Parser) parseTypeOf() (ast.Node, error) {
 	return node, err
 }
 
+func (p *Parser) parseExport() (ast.Node, error) {
+	p.next()
+	var def bool
+	if p.is(token.Keyword) && p.curr.Literal == "default" {
+		def = true
+	} else if p.is(token.Keyword) && p.curr.Literal == "from" {
+		return p.parseExportFrom()
+	}
+	node, err := p.parseNode(powLowest)
+	if err == nil {
+		node = ast.Export(node)
+		node.Default = def
+	}
+	return node
+}
+
+func (p *Parser) parseExportFrom() (ast.Node, error) {
+	p.next()
+	return nil, nil
+}
+
+func (p *Parser) parseImport() (ast.Node, error) {
+	return nil, nil
+}
+
 func (p *Parser) parseIf() (ast.Node, error) {
 	p.next()
 	var (
@@ -552,7 +577,7 @@ func (p *Parser) parseSwitch() (ast.Node, error) {
 	if err = p.expect(token.Lbrace); err != nil {
 		return nil, err
 	}
-	for !p.done() && !p.is(token.Rbrace)  {
+	for !p.done() && !p.is(token.Rbrace) {
 		if !p.is(token.Keyword) {
 			return nil, p.unexpected()
 		}
@@ -597,7 +622,7 @@ func (p *Parser) parseCase() (ast.Node, error) {
 	p.next()
 	var (
 		clause ast.CaseNode
-		err error
+		err    error
 	)
 	clause.Predicate, err = p.parseNode(powAssign)
 	if err != nil {

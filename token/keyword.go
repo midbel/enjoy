@@ -5,6 +5,7 @@ import (
 )
 
 var keywords = []string{
+	"as",
 	"let",
 	"const",
 	"for",
