@@ -62,13 +62,14 @@ type ExportFromNode struct {
 	From string
 }
 
-func ExportFrom(n Node) ExportFromNode {
+func ExportFrom(n Node, file string) ExportFromNode {
 	var x ExportFromNode
 	if e, ok := n.(ExportNode); ok {
 		x.ExportNode = e
 	} else {
 		x.ExportNode = Export(n)
 	}
+	x.From = file
 	return x
 }
 

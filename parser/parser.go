@@ -514,25 +514,90 @@ func (p *Parser) parseTypeOf() (ast.Node, error) {
 }
 
 func (p *Parser) parseExport() (ast.Node, error) {
-	p.next()
-	var def bool
-	if p.is(token.Keyword) && p.curr.Literal == "default" {
-		def = true
-	} else if p.is(token.Keyword) && p.curr.Literal == "from" {
-		return p.parseExportFrom()
+	parseFrom := func() (string, error) {
+		if err := p.expectKW("from"); err != nil {
+			return "", err
+		}
+		if !p.is(token.String) {
+			return "", p.unexpected()
+		}
+		defer p.next()
+		return p.curr.Literal, nil
 	}
-	node, err := p.parseNode(powLowest)
-	if err == nil {
-		e := ast.Export(node)
-		e.Default = def
-		node = e
-	}
-	return node, nil
-}
 
-func (p *Parser) parseExportFrom() (ast.Node, error) {
+	parseList := func() (ast.Node, error) {
+		p.next()
+		var list []ast.Node
+		for !p.done() && !p.is(token.Rbrace) {
+			switch {
+			case p.is(token.Ident):
+			case p.is(token.String):
+			case p.is(token.Keyword) && p.curr.Literal == "default":
+			default:
+				return nil, p.unexpected()
+			}
+			var (
+				ident = p.curr.Literal
+				alias string
+			)
+			p.next()
+			if p.is(token.Keyword) && p.curr.Literal == "as" {
+				p.next()
+				if !p.is(token.Ident) && !p.is(token.String) {
+					return nil, p.unexpected()
+				}
+				alias = p.curr.Literal
+				p.next()
+			}
+			list = append(list, ast.Alias(ident, alias))
+			switch {
+			case p.is(token.Comma):
+				p.next()
+				if p.is(token.Rbrace) {
+					return nil, p.unexpected()
+				}
+			case p.is(token.Rbrace):
+			default:
+				return nil, p.unexpected()
+			}
+		}
+		return ast.Sequence(list), p.expect(token.Rbrace)
+	}
+
 	p.next()
-	return nil, nil
+	if p.is(token.Keyword) {
+		var node ast.ExportNode
+		if p.curr.Literal == "default" {
+			node.Default = true
+			p.next()
+		}
+		n, err := p.parseNode(powLowest)
+		if err != nil {
+			return nil, err
+		}
+		node.Node = n
+		return node, nil
+	}
+	if p.is(token.Lbrace) {
+		node, err := parseList()
+		if err != nil {
+			return nil, err
+		}
+		if p.is(token.Keyword) && p.curr.Literal == "from" {
+			file, err := parseFrom()
+			return ast.ExportFrom(node, file), err
+		}
+		return ast.Export(node), nil
+	}
+	if p.is(token.Mul) {
+		p.next()
+		file, err := parseFrom()
+		if err != nil {
+			return nil, err
+		}
+		return ast.ExportFrom(nil, file), nil
+	}
+	return nil, p.unexpected()
 }
 
 func (p *Parser) parseImport() (ast.Node, error) {
