@@ -591,11 +591,17 @@ func (p *Parser) parseExport() (ast.Node, error) {
 	}
 	if p.is(token.Mul) {
 		p.next()
+		var ident ast.Node
+		if p.is(token.Keyword) && p.curr.Literal == "as" {
+			p.next()
+			ident = ast.CreateVar(p.curr.Literal)
+			p.next()
+		}
 		file, err := parseFrom()
 		if err != nil {
 			return nil, err
 		}
-		return ast.ExportFrom(nil, file), nil
+		return ast.ExportFrom(ident, file), nil
 	}
 	return nil, p.unexpected()
 }
