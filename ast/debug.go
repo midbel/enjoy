@@ -37,12 +37,7 @@ func debug(n Node, level int, w io.Writer) error {
 		fmt.Fprintln(w)
 	case TemplateNode:
 		return debugNode(w, "template", prefix, func() error {
-			for i := range n.Nodes {
-				if err := debug(n.Nodes[i], level+1, w); err != nil {
-					return err
-				}
-			}
-			return nil
+			return debugList(n.Nodes, level+1, w)
 		})
 	case NullNode:
 		fmt.Fprint(w, prefix)
@@ -58,12 +53,7 @@ func debug(n Node, level int, w io.Writer) error {
 		})
 	case ArrayNode:
 		return debugNode(w, "array", prefix, func() error {
-			for i := range n.List {
-				if err := debug(n.List[i], level+1, w); err != nil {
-					return err
-				}
-			}
-			return nil
+			return debugList(n.List, level+1, w)
 		})
 	case ObjectNode:
 		return debugNode(w, "object", prefix, func() error {
@@ -103,17 +93,23 @@ func debug(n Node, level int, w io.Writer) error {
 		return debugUnary(w, n, level)
 	case BinaryNode:
 		return debugBinary(w, n, level)
+	case FuncNode:
+		return debugFunc(w, n, level)
+	case CallNode:
+		return debugCall(w, n, level)
+	case ReturnNode:
+		return debugNode(w, "return", prefix, func() error {
+			return debug(n.Node, level+1, w)
+		})
 	case TryNode:
 	case CatchNode:
 	case ThrowNode:
+		return debugNode(w, "throw", prefix, func() error {
+			return debug(n.Node, level+1, w)
+		})
 	case BlockNode:
 		return debugNode(w, "block", prefix, func() error {
-			for i := range n.Nodes {
-				if err := debug(n.Nodes[i], level+1, w); err != nil {
-					return err
-				}
-			}
-			return nil
+			return debugList(n.Nodes, level+1, w)
 		})
 	case IfNode:
 		return debugNode(w, "if", prefix, func() error {
@@ -122,11 +118,31 @@ func debug(n Node, level int, w io.Writer) error {
 	case SwitchNode:
 	case CaseNode:
 	case WhileNode:
+		return debugNode(w, "while", prefix, func() error {
+			return nil
+		})
 	case DoNode:
 	case ForNode:
 	case LabelNode:
+		fmt.Fprint(w, prefix)
+		fmt.Fprintf(w, "label(%s)", n.Ident)
+		fmt.Fprintln(w)
 	case BreakNode:
+		fmt.Fprint(w, prefix)
+		if n.Label != "" {
+			fmt.Fprintf(w, "break(%s)", n.Label)
+		} else {
+			fmt.Fprint(w, "break")
+		}
+		fmt.Fprintln(w)
 	case ContinueNode:
+		fmt.Fprint(w, prefix)
+		if n.Label != "" {
+			fmt.Fprintf(w, "continue(%s)", n.Label)
+		} else {
+			fmt.Fprint(w, "continue")
+		}
+		fmt.Fprintln(w)
 	default:
 	}
 	return nil
@@ -155,6 +171,8 @@ func debugBinary(w io.Writer, n BinaryNode, level int) error {
 	switch n.Op {
 	default:
 		name = "unknown"
+	case token.AddAssign:
+		name = "add-assign"
 	case token.Add:
 		name = "add"
 	case token.Sub:
@@ -193,7 +211,69 @@ func debugBinary(w io.Writer, n BinaryNode, level int) error {
 }
 
 func debugUnary(w io.Writer, n UnaryNode, level int) error {
+	var (
+		name   string
+		prefix = strings.Repeat(" ", level)
+	)
+	switch n.Op {
+	case token.Not:
+		name = "not"
+	case token.Sub:
+		name = "reverse"
+	default:
+		name = "unknown"
+	}
+	return debugNode(w, name, prefix, func() error {
+		return debug(n.Expr, level+1, w)
+	})
+}
+
+func debugList(list []Node, level int, w io.Writer) error {
+	for i := range list {
+		if err := debug(list[i], level, w); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func debugArgs(args Node, level int, w io.Writer) error {
+	seq, ok := args.(SeqNode)
+	if !ok {
+		return debug(args, level, w)
+	}
+	return debugList(seq.Nodes, level, w)
+}
+
+func debugFunc(w io.Writer, n FuncNode, level int) error {
+	var (
+		prefix = strings.Repeat(" ", level)
+		name   = fmt.Sprintf("function(%s)", n.Ident)
+		err    error
+	)
+	return debugNode(w, name, prefix, func() error {
+		prefix = strings.Repeat(" ", level+1)
+		err = debugNode(w, "parameters", prefix, func() error {
+			return debugArgs(n.Args, level+2, w)
+		})
+		if err != nil {
+			return err
+		}
+		return debug(n.Body, level+1, w)
+	})
+}
+
+func debugCall(w io.Writer, n CallNode, level int) error {
+	prefix := strings.Repeat(" ", level)
+	return debugNode(w, "call", prefix, func() error {
+		if err := debug(n.Ident, level+1, w); err != nil {
+			return err
+		}
+		prefix = strings.Repeat(" ", level+1)
+		return debugNode(w, "arguments", prefix, func() error {
+			return debugArgs(n.Args, level+2, w)
+		})
+	})
 }
 
 func debugIf(w io.Writer, n IfNode, level int) error {
