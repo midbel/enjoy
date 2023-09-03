@@ -565,7 +565,8 @@ func (p *Parser) parseExport() (ast.Node, error) {
 	}
 
 	p.next()
-	if p.is(token.Keyword) {
+	switch {
+	case p.is(token.Keyword):
 		var node ast.ExportNode
 		if p.curr.Literal == "default" {
 			node.Default = true
@@ -577,8 +578,7 @@ func (p *Parser) parseExport() (ast.Node, error) {
 		}
 		node.Node = n
 		return node, nil
-	}
-	if p.is(token.Lbrace) {
+	case p.is(token.Lbrace):
 		node, err := parseList()
 		if err != nil {
 			return nil, err
@@ -588,8 +588,7 @@ func (p *Parser) parseExport() (ast.Node, error) {
 			return ast.ExportFrom(node, file), err
 		}
 		return ast.Export(node), nil
-	}
-	if p.is(token.Mul) {
+	case p.is(token.Mul):
 		p.next()
 		var ident ast.Node
 		if p.is(token.Keyword) && p.curr.Literal == "as" {
@@ -602,8 +601,9 @@ func (p *Parser) parseExport() (ast.Node, error) {
 			return nil, err
 		}
 		return ast.ExportFrom(ident, file), nil
+	default:
+		return nil, p.unexpected()
 	}
-	return nil, p.unexpected()
 }
 
 func (p *Parser) parseImport() (ast.Node, error) {
@@ -696,16 +696,13 @@ func (p *Parser) parseImport() (ast.Node, error) {
 	}
 
 	p.next()
-	if p.is(token.String) {
+	switch {
+	case p.is(token.String):
 		defer p.next()
 		return ast.Import(nil, p.curr.Literal), nil
-	}
-
-	if p.is(token.Mul) {
+	case p.is(token.Mul):
 		return parseStar(nil)
-	}
-
-	if p.is(token.Ident) {
+	case p.is(token.Ident):
 		ident := ast.CreateVar(p.curr.Literal)
 		if file, err := parseFrom(); err == nil {
 			return ast.Import(ident, file), nil
@@ -720,12 +717,11 @@ func (p *Parser) parseImport() (ast.Node, error) {
 			return parseList(ident)
 		}
 		return nil, p.unexpected()
-	}
-
-	if p.is(token.Lbrace) {
+	case p.is(token.Lbrace):
 		return parseList(nil)
+	default:
+		return nil, p.unexpected()
 	}
-	return nil, p.unexpected()
 }
 
 func (p *Parser) parseIf() (ast.Node, error) {
