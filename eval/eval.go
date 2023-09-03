@@ -139,6 +139,12 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 		return eval(n.Node, ev)
 	case ast.ReturnNode:
 		return evalReturn(n, ev)
+	case ast.ImportNode:
+		return evalImport(n, ev)
+	case ast.ExportNode:
+		return evalExport(n, ev)
+	case ast.ExportFromNode:
+		return evalExportFrom(n, ev)
 	default:
 		return nil, fmt.Errorf("node type %T not recognized", node)
 	}
