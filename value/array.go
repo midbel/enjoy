@@ -85,9 +85,9 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"fill":          CheckArity(1, arrayFill),
 	"filter":        CheckArity(1, arrayFilter),
 	"find":          CheckArity(1, arrayFind),
-	"findIndex":     arrayFindIndex,
-	"findLast":      arrayFindLast,
-	"findLastIndex": arrayFindLastIndex,
+	"findIndex":     CheckArity(1, arrayFindIndex),
+	"findLast":      CheckArity(1, arrayFindLast),
+	"findLastIndex": CheckArity(1, arrayFindLastIndex),
 	"flat":          CheckArity(0, arrayFlat),
 	"flatMap":       arrayFlatMap,
 	"includes":      arrayIncludes,
@@ -103,7 +103,7 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"reverse":       arrayReverse,
 	"shift":         arrayShift,
 	"slice":         arraySlice,
-	"some":          arraySome,
+	"some":          CheckArity(1, arraySome),
 	"sort":          arraySort,
 	"splice":        arraySplice,
 	"unshift":       arrayUnshift,
@@ -132,12 +132,12 @@ func arrayEntries(a Array, args []Value) (Value, error) {
 }
 
 func arrayEvery(a Array, args []Value) (Value, error) {
-	errFalse := errors.New("false")
-	err := arrayApplyFunc(a, args, func(v Value, err error) error {
-		if err != nil {
-			return err
-		}
-		if !v.True() {
+	var (
+		errFalse = errors.New("false")
+		err error
+	)
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
+		if err == nil && !v.True() {
 			return errFalse
 		}
 		return nil
@@ -186,7 +186,7 @@ func arrayFilter(a Array, args []Value) (Value, error) {
 		list []Value
 		err  error
 	)
-	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
 		if err == nil && v.True() {
 			list = append(list, v)
 		}
@@ -201,50 +201,64 @@ func arrayFind(a Array, args []Value) (Value, error) {
 		err      error
 		errFound = errors.New("found")
 	)
-	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
 		if err == nil && v.True() {
 			val = v
 			return errFound
 		}
 		return err
 	})
-	if errors.Is(err, errFound) {
-		return Undefined(), nil
+	if err != nil && !errors.Is(err, errFound) {
+		return Undefined(), err
 	}
 	return val, err
 }
 
 func arrayFindIndex(a Array, args []Value) (Value, error) {
-	fn, ok := args[0].(Func)
-	if !ok {
-		return nil, ErrOperation
-	}
-	var ident string
-	if len(fn.Params) >= 1 {
-		ident = fn.Params[0].Name
-	}
-	for i := range a.values {
-		tmp := env.EnclosedEnv[Value](fn.Env)
-		if ident != "" {
-			tmp.Define(ident, a.values[i], false)
+	var (
+		val      Value = CreateFloat(-1)
+		err      error
+		errFound = errors.New("found")
+	)
+	err = arrayApplyFunc(a, args, func(v Value, i int, err error) error {
+		if err == nil && v.True() {
+			val = CreateFloat(float64(i))
+			return errFound
 		}
-		v, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
-		}
-		if v.True() {
-			return CreateFloat(float64(i)), nil
-		}
+		return err
+	})
+	if err != nil && !errors.Is(err, errFound) {
+		return Undefined(), err
 	}
-	return CreateFloat(-1), nil
+	return val, err
 }
 
 func arrayFindLast(a Array, args []Value) (Value, error) {
-	return nil, nil
+	var (
+		val Value
+		err error
+	)
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
+		if err == nil && v.True() {
+			val = v
+		}
+		return err
+	})
+	return val, err
 }
 
 func arrayFindLastIndex(a Array, args []Value) (Value, error) {
-	return nil, nil
+	var (
+		val Value = CreateFloat(-1)
+		err error
+	)
+	err = arrayApplyFunc(a, args, func(v Value, i int, err error) error {
+		if err == nil && v.True() {
+			val = CreateFloat(float64(i))
+		}
+		return err
+	})
+	return val, err
 }
 
 func arrayFlat(a Array, args []Value) (Value, error) {
@@ -276,21 +290,21 @@ func arrayFlat(a Array, args []Value) (Value, error) {
 }
 
 func arrayFlatMap(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return nil, ErrImplemented
 }
 
 func arrayForEach(a Array, args []Value) (Value, error) {
-	return Null(), arrayApplyFunc(a, args, func(_ Value, err error) error {
+	return Null(), arrayApplyFunc(a, args, func(_ Value, _ int, err error) error {
 		return err
 	})
 }
 
 func arrayIncludes(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return nil, ErrImplemented
 }
 
 func arrayIndexOf(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return nil, ErrImplemented
 }
 
 func arrayJoin(a Array, args []Value) (Value, error) {
@@ -309,15 +323,31 @@ func arrayJoin(a Array, args []Value) (Value, error) {
 }
 
 func arrayKeys(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return nil, ErrImplemented
 }
 
 func arrayLastIndexOf(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return nil, ErrImplemented
 }
 
 func arraySome(a Array, args []Value) (Value, error) {
-	return nil, nil
+	var (
+		errTrue = errors.New("true")
+		err error
+	)
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
+		if err == nil && v.True() {
+			return errTrue
+		}
+		return err
+	})
+	if err != nil && !errors.Is(err, errTrue) {
+		return Undefined(), err
+	}
+	if errors.Is(err, errTrue) {
+		return CreateBool(true), nil
+	}
+	return CreateBool(false), nil
 }
 
 func arrayPop(a Array, args []Value) (Value, error) {
@@ -373,7 +403,7 @@ func arrayMap(a Array, args []Value) (Value, error) {
 		list []Value
 		err  error
 	)
-	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
 		if err == nil {
 			list = append(list, v)
 		}
@@ -382,7 +412,7 @@ func arrayMap(a Array, args []Value) (Value, error) {
 	return CreateArray(list), err
 }
 
-func arrayApplyFunc(a Array, args []Value, apply func(v Value, err error) error) error {
+func arrayApplyFunc(a Array, args []Value, apply func(v Value, i int, err error) error) error {
 	fn, ok := args[0].(Func)
 	if !ok {
 		return ErrOperation
@@ -405,7 +435,8 @@ func arrayApplyFunc(a Array, args []Value, apply func(v Value, err error) error)
 		if index != "" {
 			tmp.Define(index, CreateFloat(float64(i)), false)
 		}
-		if err := apply(fn.Body.Eval(tmp)); err != nil {
+		v, err := fn.Body.Eval(tmp)
+		if err := apply(v, i, err); err != nil {
 			return err
 		}
 	}
