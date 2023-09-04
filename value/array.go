@@ -134,7 +134,7 @@ func arrayEntries(a Array, args []Value) (Value, error) {
 func arrayEvery(a Array, args []Value) (Value, error) {
 	var (
 		errFalse = errors.New("false")
-		err error
+		err      error
 	)
 	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
 		if err == nil && !v.True() {
@@ -333,7 +333,7 @@ func arrayLastIndexOf(a Array, args []Value) (Value, error) {
 func arraySome(a Array, args []Value) (Value, error) {
 	var (
 		errTrue = errors.New("true")
-		err error
+		err     error
 	)
 	err = arrayApplyFunc(a, args, func(v Value, _ int, err error) error {
 		if err == nil && v.True() {
