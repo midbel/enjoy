@@ -1,6 +1,7 @@
 package value
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -76,22 +77,22 @@ func (_ Array) Type() string {
 }
 
 var arrayPrototype = map[string]ValueFunc[Array]{
-	"at":            arrayAt,
-	"concat":        arrayConcat,
-	"entries":       arrayEntries,
-	"every":         arrayEvery,
-	"forEach":       arrayForEach,
-	"fill":          arrayFill,
-	"filter":        arrayFilter,
-	"find":          arrayFind,
+	"at":            CheckArity(1, arrayAt),
+	"concat":        CheckArity(-1, arrayConcat),
+	"entries":       CheckArity(0, arrayEntries),
+	"every":         CheckArity(1, arrayEvery),
+	"forEach":       CheckArity(1, arrayForEach),
+	"fill":          CheckArity(1, arrayFill),
+	"filter":        CheckArity(1, arrayFilter),
+	"find":          CheckArity(1, arrayFind),
 	"findIndex":     arrayFindIndex,
 	"findLast":      arrayFindLast,
 	"findLastIndex": arrayFindLastIndex,
-	"flat":          arrayFlat,
+	"flat":          CheckArity(0, arrayFlat),
 	"flatMap":       arrayFlatMap,
 	"includes":      arrayIncludes,
 	"indexOf":       arrayIndexOf,
-	"join":          arrayJoin,
+	"join":          CheckArity(0, arrayJoin),
 	"keys":          arrayKeys,
 	"lastIndexOf":   arrayLastIndexOf,
 	"map":           arrayMap,
@@ -110,12 +111,178 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"with":          arrayWith,
 }
 
-func arrayKeys(a Array, args []Value) (Value, error) {
+func arrayAt(a Array, args []Value) (Value, error) {
+	return a.At(args[0])
+}
+
+func arrayConcat(a Array, args []Value) (Value, error) {
+	arr := slices.Clone(a.values)
+	for i := range args {
+		if x, ok := args[i].(Array); ok {
+			arr = append(arr, x.values...)
+		} else {
+			arr = append(arr, args[i])
+		}
+	}
+	return CreateArray(arr), nil
+}
+
+func arrayEntries(a Array, args []Value) (Value, error) {
+	return nil, ErrImplemented
+}
+
+func arrayEvery(a Array, args []Value) (Value, error) {
+	errFalse := errors.New("false")
+	err := arrayApplyFunc(a, args, func(v Value, err error) error {
+		if err != nil {
+			return err
+		}
+		if !v.True() {
+			return errFalse
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errFalse) {
+		return Undefined(), err
+	}
+	if errors.Is(err, errFalse) {
+		return CreateBool(false), nil
+	}
+	return CreateBool(true), nil
+}
+
+func arrayFill(a Array, args []Value) (Value, error) {
+	var (
+		val = args[0]
+		beg = 0
+		end = len(a.values)
+		err error
+	)
+	if len(args) >= 2 {
+		beg, err = toNativeInt(args[1])
+		if err != nil {
+			return Undefined(), err
+		}
+		beg = normalizeIndex(beg, len(a.values))
+	}
+	if len(args) >= 3 {
+		end, err = toNativeInt(args[2])
+		if err != nil {
+			return Undefined(), err
+		}
+		end = normalizeIndex(end, len(a.values))
+	}
+	if end <= beg {
+		return a, nil
+	}
+	for i := range a.values[beg:end] {
+		a.values[beg+i] = val
+	}
+	return a, nil
+}
+
+func arrayFilter(a Array, args []Value) (Value, error) {
+	var (
+		list []Value
+		err  error
+	)
+	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+		if err == nil && v.True() {
+			list = append(list, v)
+		}
+		return err
+	})
+	return CreateArray(list), err
+}
+
+func arrayFind(a Array, args []Value) (Value, error) {
+	var (
+		val      Value
+		err      error
+		errFound = errors.New("found")
+	)
+	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+		if err == nil && v.True() {
+			val = v
+			return errFound
+		}
+		return err
+	})
+	if errors.Is(err, errFound) {
+		return Undefined(), nil
+	}
+	return val, err
+}
+
+func arrayFindIndex(a Array, args []Value) (Value, error) {
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var ident string
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	for i := range a.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if ident != "" {
+			tmp.Define(ident, a.values[i], false)
+		}
+		v, err := fn.Body.Eval(tmp)
+		if err != nil {
+			return nil, err
+		}
+		if v.True() {
+			return CreateFloat(float64(i)), nil
+		}
+	}
+	return CreateFloat(-1), nil
+}
+
+func arrayFindLast(a Array, args []Value) (Value, error) {
 	return nil, nil
 }
 
-func arrayJoin(a Array, args []Value) (Value, error) {
+func arrayFindLastIndex(a Array, args []Value) (Value, error) {
 	return nil, nil
+}
+
+func arrayFlat(a Array, args []Value) (Value, error) {
+	var (
+		level   = -1
+		err     error
+		flatten func(Value, int) []Value
+	)
+	if len(args) >= 1 {
+		level, err = toNativeInt(args[0])
+		if err != nil {
+			return nil, err
+		}
+	}
+	flatten = func(v Value, lvl int) []Value {
+		a, ok := v.(Array)
+		if !ok || lvl == 0 {
+			return []Value{v}
+		}
+		var list []Value
+		for i := range a.values {
+			xs := flatten(a.values[i], lvl-1)
+			list = append(list, xs...)
+		}
+		return list
+	}
+	list := flatten(a, level)
+	return CreateArray(list), nil
+}
+
+func arrayFlatMap(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
+func arrayForEach(a Array, args []Value) (Value, error) {
+	return Null(), arrayApplyFunc(a, args, func(_ Value, err error) error {
+		return err
+	})
 }
 
 func arrayIncludes(a Array, args []Value) (Value, error) {
@@ -126,23 +293,26 @@ func arrayIndexOf(a Array, args []Value) (Value, error) {
 	return nil, nil
 }
 
+func arrayJoin(a Array, args []Value) (Value, error) {
+	var (
+		list []string
+		sep  = ","
+	)
+	if len(args) >= 1 {
+		sep = args[0].String()
+	}
+	for i := range a.values {
+		list = append(list, a.values[i].String())
+	}
+	res := strings.Join(list, sep)
+	return CreateString(res), nil
+}
+
+func arrayKeys(a Array, args []Value) (Value, error) {
+	return nil, nil
+}
+
 func arrayLastIndexOf(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayAt(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayConcat(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayEntries(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayEvery(a Array, args []Value) (Value, error) {
 	return nil, nil
 }
 
@@ -198,138 +368,24 @@ func arrayReduceRight(a Array, args []Value) (Value, error) {
 	return nil, nil
 }
 
-func arrayFill(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayFilter(a Array, args []Value) (Value, error) {
-	fn, ok := args[0].(Func)
-	if !ok {
-		return nil, ErrOperation
-	}
-	var (
-		list  []Value
-		ident string
-	)
-	if len(fn.Params) >= 1 {
-		ident = fn.Params[0].Name
-	}
-	for i := range a.values {
-		tmp := env.EnclosedEnv[Value](fn.Env)
-		if ident != "" {
-			tmp.Define(ident, a.values[i], false)
-		}
-		v, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
-		}
-		if v.True() {
-			list = append(list, a.values[i])
-		}
-	}
-	return CreateArray(list), nil
-}
-
-func arrayFind(a Array, args []Value) (Value, error) {
-	fn, ok := args[0].(Func)
-	if !ok {
-		return nil, ErrOperation
-	}
-	var ident string
-	if len(fn.Params) >= 1 {
-		ident = fn.Params[0].Name
-	}
-	for i := range a.values {
-		tmp := env.EnclosedEnv[Value](fn.Env)
-		if ident != "" {
-			tmp.Define(ident, a.values[i], false)
-		}
-		v, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
-		}
-		if v.True() {
-			return a.values[i], nil
-		}
-	}
-	return Undefined(), nil
-}
-
-func arrayFindIndex(a Array, args []Value) (Value, error) {
-	fn, ok := args[0].(Func)
-	if !ok {
-		return nil, ErrOperation
-	}
-	var ident string
-	if len(fn.Params) >= 1 {
-		ident = fn.Params[0].Name
-	}
-	for i := range a.values {
-		tmp := env.EnclosedEnv[Value](fn.Env)
-		if ident != "" {
-			tmp.Define(ident, a.values[i], false)
-		}
-		v, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
-		}
-		if v.True() {
-			return CreateFloat(float64(i)), nil
-		}
-	}
-	return CreateFloat(-1), nil
-}
-
-func arrayFindLast(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayFindLastIndex(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayFlat(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
-func arrayFlatMap(a Array, args []Value) (Value, error) {
-	return nil, nil
-}
-
 func arrayMap(a Array, args []Value) (Value, error) {
-	fn, ok := args[0].(Func)
-	if !ok {
-		return nil, ErrOperation
-	}
 	var (
-		list  []Value
-		ident string
-		index string
+		list []Value
+		err  error
 	)
-	if len(fn.Params) >= 1 {
-		ident = fn.Params[0].Name
-	}
-	for i := range a.values {
-		tmp := env.EnclosedEnv[Value](fn.Env)
-		if ident != "" {
-			tmp.Define(ident, a.values[i], false)
+	err = arrayApplyFunc(a, args, func(v Value, err error) error {
+		if err == nil {
+			list = append(list, v)
 		}
-		if index != "" {
-			tmp.Define(index, CreateFloat(float64(i)), false)
-		}
-		v, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, v)
-	}
-	return CreateArray(list), nil
+		return err
+	})
+	return CreateArray(list), err
 }
 
-func arrayForEach(a Array, args []Value) (Value, error) {
+func arrayApplyFunc(a Array, args []Value, apply func(v Value, err error) error) error {
 	fn, ok := args[0].(Func)
 	if !ok {
-		return nil, ErrOperation
+		return ErrOperation
 	}
 	var (
 		ident string
@@ -349,10 +405,22 @@ func arrayForEach(a Array, args []Value) (Value, error) {
 		if index != "" {
 			tmp.Define(index, CreateFloat(float64(i)), false)
 		}
-		_, err := fn.Body.Eval(tmp)
-		if err != nil {
-			return nil, err
+		if err := apply(fn.Body.Eval(tmp)); err != nil {
+			return err
 		}
 	}
-	return null{}, nil
+	return nil
+}
+
+func normalizeIndex(x, size int) int {
+	if x < 0 {
+		return x + size
+	}
+	if x < -size {
+		return 0
+	}
+	if x >= size {
+		return size
+	}
+	return x
 }
