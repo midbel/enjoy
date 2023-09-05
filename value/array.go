@@ -94,7 +94,7 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"indexOf":       CheckArity(1, arrayIndexOf),
 	"join":          CheckArity(0, arrayJoin),
 	"keys":          arrayKeys,
-	"lastIndexOf":   arrayLastIndexOf,
+	"lastIndexOf":   CheckArity(1, arrayLastIndexOf),
 	"map":           CheckArity(1, arrayMap),
 	"pop":           CheckArity(0, arrayPop),
 	"push":          CheckArity(1, arrayPush),
@@ -367,7 +367,27 @@ func arrayKeys(a Array, args []Value) (Value, error) {
 }
 
 func arrayLastIndexOf(a Array, args []Value) (Value, error) {
-	return nil, ErrImplemented
+	var (
+		val = args[0]
+		beg int
+		err error
+	)
+	if len(args) >= 2 {
+		if beg, err = toNativeInt(args[1]); err != nil {
+			return nil, err
+		}
+		beg = normalizeIndex(beg, len(a.values))
+	}
+	for i := beg; i >= 0; i-- {
+		v, err := Compare(a.values[i], val, nil)
+		if err != nil {
+			return nil, err
+		}
+		if v.True() {
+			return CreateFloat(float64(i)), nil
+		}
+	}
+	return CreateFloat(-1), nil
 }
 
 func arrayMap(a Array, args []Value) (Value, error) {
