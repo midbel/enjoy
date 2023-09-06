@@ -89,26 +89,26 @@ var arrayPrototype = map[string]ValueFunc[Array]{
 	"findLast":      CheckArity(1, arrayFindLast),
 	"findLastIndex": CheckArity(1, arrayFindLastIndex),
 	"flat":          CheckArity(0, arrayFlat),
-	"flatMap":       arrayFlatMap,
+	"flatMap":       CheckArity(1, arrayFlatMap),
 	"includes":      CheckArity(1, arrayIncludes),
 	"indexOf":       CheckArity(1, arrayIndexOf),
 	"join":          CheckArity(0, arrayJoin),
-	"keys":          arrayKeys,
-	"lastIndexOf":   CheckArity(1, arrayLastIndexOf),
-	"map":           CheckArity(1, arrayMap),
-	"pop":           CheckArity(0, arrayPop),
-	"push":          CheckArity(1, arrayPush),
-	"reduce":        arrayReduce,
-	"reduceRight":   arrayReduceRight,
-	"reverse":       CheckArity(0, arrayReverse),
-	"shift":         CheckArity(0, arrayShift),
-	"slice":         CheckArity(0, arraySlice),
-	"some":          CheckArity(1, arraySome),
-	"sort":          arraySort,
-	"splice":        arraySplice,
-	"unshift":       CheckArity(0, arrayUnshift),
-	"values":        arrayValues,
-	"with":          CheckArity(2, arrayWith),
+	// "keys":          arrayKeys,
+	"lastIndexOf": CheckArity(1, arrayLastIndexOf),
+	"map":         CheckArity(1, arrayMap),
+	"pop":         CheckArity(0, arrayPop),
+	"push":        CheckArity(1, arrayPush),
+	"reduce":      CheckArity(1, arrayReduce),
+	"reduceRight": CheckArity(1, arrayReduceRight),
+	"reverse":     CheckArity(0, arrayReverse),
+	"shift":       CheckArity(0, arrayShift),
+	"slice":       CheckArity(0, arraySlice),
+	"some":        CheckArity(1, arraySome),
+	"sort":        CheckArity(0, arraySort),
+	"splice":      CheckArity(1, arraySplice),
+	"unshift":     CheckArity(0, arrayUnshift),
+	// "values":        arrayValues,
+	"with": CheckArity(2, arrayWith),
 }
 
 func arrayAt(a Array, args []Value) (Value, error) {
@@ -290,7 +290,59 @@ func arrayFlat(a Array, args []Value) (Value, error) {
 }
 
 func arrayFlatMap(a Array, args []Value) (Value, error) {
-	return nil, ErrImplemented
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var (
+		ident   string
+		index   string
+		array   string
+		err     error
+		flatten func(Value, Value, int) ([]Value, error)
+	)
+
+	if len(fn.Params) >= 1 {
+		ident = fn.Params[0].Name
+	}
+	if len(fn.Params) >= 2 {
+		index = fn.Params[1].Name
+	}
+	if len(fn.Params) >= 3 {
+		array = fn.Params[2].Name
+	}
+
+	flatten = func(v, arr Value, i int) ([]Value, error) {
+		a, ok := v.(Array)
+		if !ok {
+			tmp := env.EnclosedEnv[Value](fn.Env)
+			if ident != "" {
+				tmp.Define(ident, v, false)
+			}
+			if index != "" {
+				tmp.Define(index, CreateFloat(float64(i)), false)
+			}
+			if array != "" {
+				tmp.Define(array, arr, false)
+			}
+			v, err := fn.Body.Eval(tmp)
+			return []Value{v}, err
+		}
+		var list []Value
+		for i := range a.values {
+			xs, err := flatten(a.values[i], a, i)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, xs...)
+		}
+		return list, nil
+	}
+	list, err := flatten(a, a, 0)
+	if err != nil {
+		return nil, err
+	}
+	return CreateArray(list), nil
 }
 
 func arrayForEach(a Array, args []Value) (Value, error) {
@@ -312,7 +364,9 @@ func arrayIncludes(a Array, args []Value) (Value, error) {
 		beg = normalizeIndex(beg, len(a.values))
 	}
 	for i := range a.values[beg:] {
-		v, err := Compare(a.values[i], val, nil)
+		v, err := Compare(a.values[i], val, func(res int) bool {
+			return res == 0
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -336,7 +390,9 @@ func arrayIndexOf(a Array, args []Value) (Value, error) {
 		beg = normalizeIndex(beg, len(a.values))
 	}
 	for i := range a.values[beg:] {
-		v, err := Compare(a.values[i], val, nil)
+		v, err := Compare(a.values[i], val, func(res int) bool {
+			return res == 0
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -379,7 +435,9 @@ func arrayLastIndexOf(a Array, args []Value) (Value, error) {
 		beg = normalizeIndex(beg, len(a.values))
 	}
 	for i := beg; i >= 0; i-- {
-		v, err := Compare(a.values[i], val, nil)
+		v, err := Compare(a.values[i], val, func(res int) bool {
+			return res == 0
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -423,11 +481,13 @@ func arrayPush(a Array, args []Value) (Value, error) {
 }
 
 func arrayReduce(a Array, args []Value) (Value, error) {
-	return nil, nil
+	return arrayApplyReduce(a, args)
 }
 
 func arrayReduceRight(a Array, args []Value) (Value, error) {
-	return nil, nil
+	values := slices.Clone(a.values)
+	slices.Reverse(values)
+	return arrayApplyReduce(CreateArray(values).(Array), args)
 }
 
 func arrayReverse(a Array, args []Value) (Value, error) {
@@ -490,11 +550,49 @@ func arraySome(a Array, args []Value) (Value, error) {
 }
 
 func arraySort(a Array, args []Value) (Value, error) {
-	return nil, nil
+	slices.SortFunc(a.values, func(v1, v2 Value) int {
+		res, _ := compare(v1, v2)
+		return res
+	})
+	return a, nil
 }
 
 func arraySplice(a Array, args []Value) (Value, error) {
-	return nil, nil
+	var (
+		start int
+		size  int
+		err   error
+		list  []Value
+		rest  []Value
+	)
+	if start, err = toNativeInt(args[0]); err != nil {
+		return nil, err
+	}
+	start = normalizeIndex(start, len(a.values))
+	if len(args) >= 2 {
+		size, err = toNativeInt(args[1])
+		if err != nil {
+			return nil, err
+		}
+		if size < 0 {
+			return nil, fmt.Errorf("negative count")
+		}
+		if start+size >= len(a.values) {
+			a.values, list = a.values[:start], a.values[start:]
+			size = 0
+		} else {
+			list = a.values[start:start+size]
+			a.values = append(a.values[:start], a.values[start+size:]...)
+		}
+	} else {
+		a.values, list = a.values[:start], a.values[start:]
+		return CreateArray(list), nil
+	}
+	if len(args) >= 3 {
+		a.values = append(a.values[:start], append(rest, a.values[start+size:]...)...)
+		fmt.Println(a.values)
+	}
+	return CreateArray(list), nil
 }
 
 func arrayUnshift(a Array, args []Value) (Value, error) {
@@ -508,18 +606,67 @@ func arrayValues(a Array, args []Value) (Value, error) {
 
 func arrayWith(a Array, args []Value) (Value, error) {
 	var (
-		val = args[1]
 		beg int
 		err error
 	)
 	if beg, err = toNativeInt(args[0]); err != nil {
 		return nil, err
 	}
-	arr := slices.Clone(a.values)
-
 	beg = normalizeIndex(beg, len(a.values))
+
+	arr := slices.Clone(a.values)
 	arr[beg] = args[1]
 	return CreateArray(arr), nil
+}
+
+func arrayApplyReduce(arr Array, args []Value) (Value, error) {
+	fn, ok := args[0].(Func)
+	if !ok {
+		return nil, ErrOperation
+	}
+	var (
+		accum   string
+		current string
+		index   string
+		array   string
+		res     = Undefined()
+		err     error
+	)
+	if len(fn.Params) >= 1 {
+		accum = fn.Params[0].Name
+	}
+	if len(fn.Params) >= 2 {
+		current = fn.Params[1].Name
+	}
+	if len(fn.Params) >= 3 {
+		index = fn.Params[2].Name
+	}
+	if len(fn.Params) >= 4 {
+		index = fn.Params[3].Name
+	}
+	if len(args) >= 2 {
+		res = args[1]
+	}
+	for i := range arr.values {
+		tmp := env.EnclosedEnv[Value](fn.Env)
+		if accum != "" {
+			tmp.Define(accum, res, false)
+		}
+		if current != "" {
+			tmp.Define(current, arr.values[i], false)
+		}
+		if index != "" {
+			tmp.Define(index, CreateFloat(float64(i)), false)
+		}
+		if array != "" {
+			tmp.Define(array, arr, false)
+		}
+		res, err = fn.Body.Eval(tmp)
+		if err != nil {
+			break
+		}
+	}
+	return res, err
 }
 
 func arrayApplyFunc(a Array, args []Value, apply func(v Value, i int, err error) error) error {
@@ -530,12 +677,16 @@ func arrayApplyFunc(a Array, args []Value, apply func(v Value, i int, err error)
 	var (
 		ident string
 		index string
+		array string
 	)
 	if len(fn.Params) >= 1 {
 		ident = fn.Params[0].Name
 	}
 	if len(fn.Params) >= 2 {
 		index = fn.Params[1].Name
+	}
+	if len(fn.Params) >= 3 {
+		array = fn.Params[2].Name
 	}
 	for i := range a.values {
 		tmp := env.EnclosedEnv[Value](fn.Env)
@@ -544,6 +695,9 @@ func arrayApplyFunc(a Array, args []Value, apply func(v Value, i int, err error)
 		}
 		if index != "" {
 			tmp.Define(index, CreateFloat(float64(i)), false)
+		}
+		if array != "" {
+			tmp.Define(array, a, false)
 		}
 		v, err := fn.Body.Eval(tmp)
 		if err := apply(v, i, err); err != nil {

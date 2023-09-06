@@ -51,11 +51,7 @@ type Comparable interface {
 }
 
 func Compare(fst, snd Value, do func(int) bool) (Value, error) {
-	cmp, ok := fst.(Comparable)
-	if !ok {
-		return nil, ErrOperation
-	}
-	res, err := cmp.Compare(snd)
+	res, err := compare(fst, snd)
 	if err != nil {
 		if errors.Is(err, ErrIncompatible) {
 			return CreateBool(false), nil
@@ -63,6 +59,14 @@ func Compare(fst, snd Value, do func(int) bool) (Value, error) {
 		return nil, err
 	}
 	return CreateBool(do(res)), nil
+}
+
+func compare(fst, snd Value) (int, error) {
+	cmp, ok := fst.(Comparable)
+	if !ok {
+		return -1, ErrOperation
+	}
+	return cmp.Compare(snd)
 }
 
 type Callable interface {
