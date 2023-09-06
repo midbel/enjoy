@@ -563,7 +563,6 @@ func arraySplice(a Array, args []Value) (Value, error) {
 		size  int
 		err   error
 		list  []Value
-		rest  []Value
 	)
 	if start, err = toNativeInt(args[0]); err != nil {
 		return nil, err
@@ -589,8 +588,8 @@ func arraySplice(a Array, args []Value) (Value, error) {
 		return CreateArray(list), nil
 	}
 	if len(args) >= 3 {
+		rest := slices.Clone(args[2:])
 		a.values = append(a.values[:start], append(rest, a.values[start+size:]...)...)
-		fmt.Println(a.values)
 	}
 	return CreateArray(list), nil
 }
