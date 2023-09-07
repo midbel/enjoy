@@ -200,6 +200,7 @@ var numberPrototype = map[string]ValueFunc[Float]{
 	"toExponential": CheckArity(0, floatToExponential),
 	"toFixed": CheckArity(0, floatToFixed),
 	"toPrecision": CheckArity(0, floatToPrecision),
+	"toString": CheckArity(0, floatToString),
 }
 
 func floatToExponential(f Float, args []Value) (Value, error) {
@@ -212,6 +213,10 @@ func floatToFixed(f Float, args []Value) (Value, error) {
 
 func floatToPrecision(f Float, args []Value) (Value, error) {
 	return formatNumber(f.value, 'g', args)
+}
+
+func floatToString(f Float, _ []Value) (Value, error) {
+	return CreateString(f.String()), nil
 }
 
 func formatNumber(f float64, char rune, args []Value) (Value, error) {

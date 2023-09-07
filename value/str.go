@@ -111,6 +111,7 @@ var stringPrototype = map[string]ValueFunc[Str]{
 	"substring":   CheckArity(1, strSubstr),
 	"toUpperCase": CheckArity(0, strUpper),
 	"toLowerCase": CheckArity(0, strLower),
+	"toString": CheckArity(0, strToString),
 	"trim":        CheckArity(0, strTrim),
 	"trimEnd":     CheckArity(0, strTrimRight),
 	"trimStart":   CheckArity(0, strTrimLeft),
@@ -348,6 +349,10 @@ func strSubstr(s Str, args []Value) (Value, error) {
 		return Undefined(), ErrIndex
 	}
 	return CreateString(s.value[start:end]), nil
+}
+
+func strToString(s Str, _ []Value) (Value, error) {
+	return s, nil
 }
 
 func strTrim(s Str, _ []Value) (Value, error) {
