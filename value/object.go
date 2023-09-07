@@ -19,12 +19,12 @@ type Object struct {
 }
 
 func CreateObject(list map[string]Value) Value {
-	return Object{
+	return &Object{
 		values: list,
 	}
 }
 
-func (o Object) Keys() Value {
+func (o *Object) Keys() Value {
 	var list []Value
 	for k := range o.values {
 		list = append(list, CreateString(k))
@@ -43,7 +43,7 @@ func (o *Object) Seal() {
 	o.sealed = true
 }
 
-func (o Object) At(ix Value) (Value, error) {
+func (o *Object) At(ix Value) (Value, error) {
 	v, ok := o.values[ix.String()]
 	if !ok {
 		return undefined{}, nil
@@ -51,7 +51,7 @@ func (o Object) At(ix Value) (Value, error) {
 	return v, nil
 }
 
-func (o Object) Get(prop string) (Value, error) {
+func (o *Object) Get(prop string) (Value, error) {
 	if prop == "length" {
 		return CreateFloat(float64(len(o.values))), nil
 	}
@@ -62,22 +62,22 @@ func (o Object) Get(prop string) (Value, error) {
 	return v, nil
 }
 
-func (o Object) Set(prop string, val Value) (Value, error) {
+func (o *Object) Set(prop string, val Value) (Value, error) {
 	if o.frozen {
 		return nil, ErrOperation
 	}
 	return nil, nil
 }
 
-func (o Object) Call(fn string, args []Value) (Value, error) {
+func (o *Object) Call(fn string, args []Value) (Value, error) {
 	return nil, nil
 }
 
-func (o Object) True() bool {
+func (o *Object) True() bool {
 	return len(o.values) > 0
 }
 
-func (o Object) String() string {
+func (o *Object) String() string {
 	var str strings.Builder
 	str.WriteRune('{')
 
@@ -96,6 +96,6 @@ func (o Object) String() string {
 	return str.String()
 }
 
-func (o Object) Type() string {
+func (o *Object) Type() string {
 	return "object"
 }

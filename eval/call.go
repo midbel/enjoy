@@ -112,9 +112,9 @@ func prepareArgs(fn value.Func, args []value.Value, ev env.Environ[value.Value])
 			return nil, err
 		}
 		switch arg := arg.(type) {
-		case value.Object:
+		case *value.Object:
 			err = argObject(p, arg, tmp)
-		case value.Array:
+		case *value.Array:
 			err = argArray(p, arg, tmp)
 		case value.Spread:
 			for _, a := range arg.Spread() {
@@ -154,7 +154,7 @@ func argValue(prm value.Parameter, arg value.Value, ev env.Environ[value.Value])
 	return arg, nil
 }
 
-func argArray(prm value.Parameter, arr value.Array, ev env.Environ[value.Value]) error {
+func argArray(prm value.Parameter, arr *value.Array, ev env.Environ[value.Value]) error {
 	switch a := prm.Value.(type) {
 	case ast.AssignNode:
 		prm.Value = a.Ident
@@ -170,7 +170,7 @@ func argArray(prm value.Parameter, arr value.Array, ev env.Environ[value.Value])
 	return nil
 }
 
-func argObject(prm value.Parameter, obj value.Object, ev env.Environ[value.Value]) error {
+func argObject(prm value.Parameter, obj *value.Object, ev env.Environ[value.Value]) error {
 	switch a := prm.Value.(type) {
 	case ast.AssignNode:
 		prm.Value = a.Ident

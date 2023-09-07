@@ -177,7 +177,7 @@ func SpreadValue(v Value) (Value, error) {
 
 func (s Spread) Spread() []Value {
 	switch s := s.Value.(type) {
-	case Array:
+	case *Array:
 		return s.Spread()
 	case Str:
 		return s.Spread()

@@ -198,7 +198,7 @@ func evalBindObject(o ast.BindingObjectNode, n ast.Node, ev env.Environ[value.Va
 }
 
 func bindObject(o ast.BindingObjectNode, v value.Value, ev env.Environ[value.Value], ro bool) error {
-	obj, ok := v.(value.Object)
+	obj, ok := v.(*value.Object)
 	if !ok {
 		return nil
 	}
@@ -254,7 +254,7 @@ func evalBindArray(a ast.BindingArrayNode, n ast.Node, ev env.Environ[value.Valu
 }
 
 func bindArray(a ast.BindingArrayNode, v value.Value, ev env.Environ[value.Value], ro bool) error {
-	arr, ok := v.(value.Array)
+	arr, ok := v.(*value.Array)
 	if !ok {
 		return ErrEval
 	}

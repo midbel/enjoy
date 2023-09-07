@@ -13,7 +13,7 @@ func Object() value.Value {
 }
 
 func objectKeys(_ value.Global, args []value.Value) (value.Value, error) {
-	obj, ok := args[0].(value.Object)
+	obj, ok := args[0].(*value.Object)
 	if !ok {
 		return nil, value.ErrOperation
 	}
@@ -21,7 +21,7 @@ func objectKeys(_ value.Global, args []value.Value) (value.Value, error) {
 }
 
 func objectFreeze(_ value.Global, args []value.Value) (value.Value, error) {
-	obj, ok := args[0].(value.Object)
+	obj, ok := args[0].(*value.Object)
 	if !ok {
 		return nil, value.ErrOperation
 	}
@@ -30,7 +30,7 @@ func objectFreeze(_ value.Global, args []value.Value) (value.Value, error) {
 }
 
 func objectSeal(_ value.Global, args []value.Value) (value.Value, error) {
-	obj, ok := args[0].(value.Object)
+	obj, ok := args[0].(*value.Object)
 	if !ok {
 		return nil, value.ErrOperation
 	}
