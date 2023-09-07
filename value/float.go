@@ -219,7 +219,7 @@ func floatToString(f Float, _ []Value) (Value, error) {
 	return CreateString(f.String()), nil
 }
 
-func formatNumber(f float64, char rune, args []Value) (Value, error) {
+func formatNumber(f float64, char byte, args []Value) (Value, error) {
 	var (
 		prec = -1
 		err  error
