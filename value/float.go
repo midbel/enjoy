@@ -180,8 +180,12 @@ func (f Float) Compare(other Value) (int, error) {
 	return res, nil
 }
 
-func (f Float) Call(fn string, args []string) (Value, error) {
-	return nil, nil
+func (f Float) Call(fn string, args []Value) (Value, error) {
+	call, ok := numberPrototype[fn]
+	if !ok {
+		return nil, fmt.Errorf("%s not defined on number", fn)
+	}
+	return call(f, args)
 }
 
 func (f Float) String() string {
@@ -190,4 +194,37 @@ func (f Float) String() string {
 
 func (_ Float) Type() string {
 	return "float"
+}
+
+var numberPrototype = map[string]ValueFunc[Float]{
+	"toExponential": CheckArity(0, floatToExponential),
+	"toFixed": CheckArity(0, floatToFixed),
+	"toPrecision": CheckArity(0, floatToPrecision),
+}
+
+func floatToExponential(f Float, args []Value) (Value, error) {
+	return formatNumber(f.value, 'e', args)
+}
+
+func floatToFixed(f Float, args []Value) (Value, error) {
+	return formatNumber(f.value, 'f', args)
+}
+
+func floatToPrecision(f Float, args []Value) (Value, error) {
+	return formatNumber(f.value, 'g', args)
+}
+
+func formatNumber(f float64, char rune, args []Value) (Value, error) {
+	var (
+		prec = -1
+		err error
+	)
+	if len(args) >= 1 {
+		prec, err = toNativeInt(args[0])
+		if err != nil {
+			return nil, err
+		}
+	}
+	str := strconv.FormatFloat(f, char, prec, 64)
+	return CreateString(str), nil
 }
