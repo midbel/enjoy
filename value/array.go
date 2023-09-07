@@ -106,7 +106,7 @@ var arrayPrototype = map[string]ValueFunc[*Array]{
 	"some":        CheckArity(1, arraySome),
 	"sort":        CheckArity(0, arraySort),
 	"splice":      CheckArity(1, arraySplice),
-	"toString": CheckArity(0, arrayToString),
+	"toString":    CheckArity(0, arrayToString),
 	"unshift":     CheckArity(0, arrayUnshift),
 	// "values":        arrayValues,
 	"with": CheckArity(2, arrayWith),

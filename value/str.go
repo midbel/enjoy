@@ -111,7 +111,7 @@ var stringPrototype = map[string]ValueFunc[Str]{
 	"substring":   CheckArity(1, strSubstr),
 	"toUpperCase": CheckArity(0, strUpper),
 	"toLowerCase": CheckArity(0, strLower),
-	"toString": CheckArity(0, strToString),
+	"toString":    CheckArity(0, strToString),
 	"trim":        CheckArity(0, strTrim),
 	"trimEnd":     CheckArity(0, strTrimRight),
 	"trimStart":   CheckArity(0, strTrimLeft),
