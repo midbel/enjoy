@@ -12,21 +12,37 @@ type Descriptor struct {
 	Enumerable   bool
 }
 
+func createDescriptor(val Value) Descriptor {
+	return Descriptor{
+		Value:        val,
+		Writable:     true,
+		Configurable: true,
+		Enumerable:   true,
+	}
+}
+
 type Object struct {
 	frozen bool
 	sealed bool
-	values map[string]Value
+	values map[string]Descriptor
 }
 
 func CreateObject(list map[string]Value) Value {
-	return &Object{
-		values: list,
+	obj := Object{
+		values: make(map[string]Descriptor),
 	}
+	for k, v := range list {
+		obj.values[k] = createDescriptor(v)
+	}
+	return &obj
 }
 
 func (o *Object) Keys() Value {
 	var list []Value
-	for k := range o.values {
+	for k, v := range o.values {
+		if !v.Enumerable {
+			continue
+		}
 		list = append(list, CreateString(k))
 	}
 	slices.SortFunc(list, func(s1, s2 Value) int {

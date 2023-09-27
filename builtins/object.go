@@ -9,7 +9,22 @@ func Object() value.Value {
 	obj.RegisterFunc("freeze", objectFreeze)
 	obj.RegisterFunc("seal", objectSeal)
 	obj.RegisterFunc("keys", objectKeys)
+	obj.RegisterFunc("create", objectCreate)
+	obj.RegisterFunc("assign", objectAssign)
+	obj.RegisterFunc("entries", objectEntries)
 	return obj
+}
+
+func objectAssign(_ value.Global, args []value.Value) (value.Value, error) {
+	return nil, nil
+}
+
+func objectEntries(_ value.Global, args []value.Value) (value.Value, error) {
+	return nil, nil
+}
+
+func objectCreate(_ value.Global, args []value.Value) (value.Value, error) {
+	return nil, nil
 }
 
 func objectKeys(_ value.Global, args []value.Value) (value.Value, error) {

@@ -169,14 +169,10 @@ func (f Float) Lshift(other Value) (Value, error) {
 	case Float:
 		tmp := int64(f.value) << int64(x.value)
 		f.value = float64(tmp)
-		return f
-	case undefined:
-		return CreateFloat(math.NaN())
-	default:
 		return f, nil
-	}
-	x, ok := other.(Float)
-	if !ok {
+	case undefined:
+		return CreateFloat(math.NaN()), nil
+	default:
 		return nil, ErrIncompatible
 	}
 }
@@ -186,14 +182,10 @@ func (f Float) Rshift(other Value) (Value, error) {
 	case Float:
 		tmp := int64(f.value) >> int64(x.value)
 		f.value = float64(tmp)
-		return f
-	case undefined:
-		return CreateFloat(math.NaN())
-	default:
 		return f, nil
-	}
-	x, ok := other.(Float)
-	if !ok {
+	case undefined:
+		return CreateFloat(math.NaN()), nil
+	default:
 		return nil, ErrIncompatible
 	}
 }
@@ -203,14 +195,10 @@ func (f Float) Band(other Value) (Value, error) {
 	case Float:
 		tmp := int64(f.value) & int64(x.value)
 		f.value = float64(tmp)
-		return f
-	case undefined:
-		return CreateFloat(math.NaN())
-	default:
 		return f, nil
-	}
-	x, ok := other.(Float)
-	if !ok {
+	case undefined:
+		return CreateFloat(math.NaN()), nil
+	default:
 		return nil, ErrIncompatible
 	}
 }
@@ -220,14 +208,10 @@ func (f Float) Bor(other Value) (Value, error) {
 	case Float:
 		tmp := int64(f.value) | int64(x.value)
 		f.value = float64(tmp)
-		return f
-	case undefined:
-		return CreateFloat(math.NaN())
-	default:
 		return f, nil
-	}
-	x, ok := other.(Float)
-	if !ok {
+	case undefined:
+		return CreateFloat(math.NaN()), nil
+	default:
 		return nil, ErrIncompatible
 	}
 }

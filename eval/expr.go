@@ -123,14 +123,14 @@ func evalAssign(n ast.AssignNode, ev env.Environ[value.Value]) (value.Value, err
 
 func strictEqual(fst, snd value.Value) (value.Value, error) {
 	if fst.Type() == snd.Type() {
-		return value.CreateBool(false)
+		return value.CreateBool(false), nil
 	}
 	return cmpEq(fst, snd)
 }
 
 func strictNotEqual(fst, snd value.Value) (value.Value, error) {
 	if fst.Type() != snd.Type() {
-		return value.CreateBool(true)
+		return value.CreateBool(true), nil
 	}
 	return cmpNe(fst, snd)
 }
