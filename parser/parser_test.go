@@ -10,6 +10,7 @@ func TestParser(t *testing.T) {
 		"testdata/variables.js",
 		"testdata/control.js",
 		"testdata/func.js",
+		"testdata/export.js",
 	}
 	for _, f := range files {
 		parseFile(t, f)

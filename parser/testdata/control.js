@@ -74,3 +74,13 @@ for (const { user, pass } of users) {
   }
   console.log(`${user}: weak password ${pass}`)
 }
+
+switch (foobar) {
+case 1:
+  break;
+case 2:
+  console.log(2)
+  break;
+default:
+  console.log("default")
+}
