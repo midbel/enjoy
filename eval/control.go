@@ -111,6 +111,10 @@ func evalIf(n ast.IfNode, ev env.Environ[value.Value]) (value.Value, error) {
 	return nil, nil
 }
 
+func evalSwitch(n ast.SwitchNode, ev env.Environ[value.Value]) (value.Value, error) {
+	return nil, nil
+}
+
 func evalThrow(n ast.ThrowNode, ev env.Environ[value.Value]) (value.Value, error) {
 	v, err := eval(n.Node, ev)
 	if err == nil {

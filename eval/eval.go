@@ -116,11 +116,13 @@ func eval(node ast.Node, ev env.Environ[value.Value]) (value.Value, error) {
 	case ast.BinaryNode:
 		return evalBinary(n, ev)
 	case ast.TryNode:
+		return evalTry(n, ev)
 	case ast.CatchNode:
 	case ast.ThrowNode:
 	case ast.IfNode:
 		return evalIf(n, ev)
 	case ast.SwitchNode:
+		return evalSwitch(n, ev)
 	case ast.WhileNode:
 		return evalWhile(n, ev)
 	case ast.DoNode:
