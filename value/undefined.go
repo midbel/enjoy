@@ -34,6 +34,22 @@ func (_ undefined) Div(_ Value) (Value, error) {
 	return CreateFloat(math.NaN()), nil
 }
 
+func (_ undefined) Lshift(_ Value) (Value, error) {
+	return CreateFloat(math.NaN()), nil
+}
+
+func (_ undefined) Rshift(_ Value) (Value, error) {
+	return CreateFloat(math.NaN()), nil
+}
+
+func (_ undefined) Band(_ Value) (Value, error) {
+	return CreateFloat(math.NaN()), nil
+}
+
+func (_ undefined) Bor(_ Value) (Value, error) {
+	return CreateFloat(math.NaN()), nil
+}
+
 func (_ undefined) Compare(other Value) (int, error) {
 	if _, ok := other.(undefined); ok {
 		return 0, nil

@@ -35,13 +35,17 @@ func evalBinary(n ast.BinaryNode, ev env.Environ[value.Value]) (value.Value, err
 	case token.Pow:
 		return powValues(left, right)
 	case token.Lshift:
+		return lshiftValues(left, right)
 	case token.Rshift:
+		return rshiftValues(left, right)
 	case token.Eq:
 		return cmpEq(left, right)
 	case token.Seq:
+		return strictEqual(left, right)
 	case token.Ne:
 		return cmpNe(left, right)
 	case token.Sne:
+		return strictNotEqual(left, right)
 	case token.Lt:
 		return cmpLt(left, right)
 	case token.Le:
@@ -51,7 +55,9 @@ func evalBinary(n ast.BinaryNode, ev env.Environ[value.Value]) (value.Value, err
 	case token.Ge:
 		return cmpGe(left, right)
 	case token.Band:
+		return bandValues(left, right)
 	case token.Bor:
+		return borValues(left, right)
 	case token.And:
 		return value.CreateBool(left.True() && right.True()), nil
 	case token.Or:
@@ -113,6 +119,20 @@ func evalAssign(n ast.AssignNode, ev env.Environ[value.Value]) (value.Value, err
 		err = ev.Assign(ident.Ident, v)
 	}
 	return v, err
+}
+
+func strictEqual(fst, snd value.Value) (value.Value, error) {
+	if fst.Type() == snd.Type() {
+		return value.CreateBool(false)
+	}
+	return cmpEq(fst, snd)
+}
+
+func strictNotEqual(fst, snd value.Value) (value.Value, error) {
+	if fst.Type() != snd.Type() {
+		return value.CreateBool(true)
+	}
+	return cmpNe(fst, snd)
 }
 
 func cmpEq(fst, snd value.Value) (value.Value, error) {
@@ -197,4 +217,44 @@ func divValues(fst, snd value.Value) (value.Value, error) {
 		return nil, value.ErrOperation
 	}
 	return a.Div(snd)
+}
+
+func lshiftValues(fst, snd value.Value) (value.Value, error) {
+	a, ok := fst.(interface {
+		Lshift(value.Value) (value.Value, error)
+	})
+	if !ok {
+		return nil, value.ErrOperation
+	}
+	return a.Lshift(snd)
+}
+
+func rshiftValues(fst, snd value.Value) (value.Value, error) {
+	a, ok := fst.(interface {
+		Rshift(value.Value) (value.Value, error)
+	})
+	if !ok {
+		return nil, value.ErrOperation
+	}
+	return a.Rshift(snd)
+}
+
+func bandValues(fst, snd value.Value) (value.Value, error) {
+	a, ok := fst.(interface {
+		Band(value.Value) (value.Value, error)
+	})
+	if !ok {
+		return nil, value.ErrOperation
+	}
+	return a.Band(snd)
+}
+
+func borValues(fst, snd value.Value) (value.Value, error) {
+	a, ok := fst.(interface {
+		Bor(value.Value) (value.Value, error)
+	})
+	if !ok {
+		return nil, value.ErrOperation
+	}
+	return a.Bor(snd)
 }
