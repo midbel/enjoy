@@ -13,7 +13,7 @@ type context struct {
 func defaultContext(ev env.Environ[value.Value]) *context {
 	return &context{
 		Environ: ev,
-		modules: make(map[string]Module)
+		modules: make(map[string]Module),
 	}
 }
 
