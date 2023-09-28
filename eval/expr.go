@@ -110,13 +110,25 @@ func evalUnary(n ast.UnaryNode, ev env.Environ[value.Value]) (value.Value, error
 }
 
 func evalAssign(n ast.AssignNode, ev env.Environ[value.Value]) (value.Value, error) {
-	ident, ok := n.Ident.(ast.VarNode)
-	if !ok {
-		return nil, ErrEval
-	}
 	v, err := eval(n.Expr, ev)
-	if err == nil {
+	if err != nil {
+		return nil, err
+	}
+	switch ident := n.Ident.(type) {
+	case ast.VarNode:
 		err = ev.Assign(ident.Ident, v)
+	case ast.MemberNode:
+		obj, err := eval(ident.Curr, ev)
+		if err != nil {
+			return nil, err
+		}
+		id, ok := ident.Next.(ast.VarNode)
+		if !ok {
+			return nil, ErrEval
+		}
+		err = value.Set(obj, id.Ident, v)
+	default:
+		return nil, ErrEval
 	}
 	return v, err
 }

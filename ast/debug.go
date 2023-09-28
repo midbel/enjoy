@@ -47,6 +47,9 @@ func debug(n Node, level int, w io.Writer) error {
 		fmt.Fprint(w, prefix)
 		fmt.Fprint(w, "undefined")
 		fmt.Fprintln(w)
+	case MemberNode:
+		fmt.Fprint(w, prefix)
+		fmt.Fprintln(w)
 	case SpreadNode:
 		return debugNode(w, "spread", prefix, func() error {
 			return debug(n.Node, level+1, w)

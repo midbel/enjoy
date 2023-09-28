@@ -101,6 +101,14 @@ type Setter interface {
 	Set(string, Value) error
 }
 
+func Set(v Value, prop string, val Value) error {
+	s, ok := v.(Setter)
+	if !ok {
+		return ErrOperation
+	}
+	return s.Set(prop, val)
+}
+
 type ValueFunc[T any] func(T, []Value) (Value, error)
 
 func CheckArity[T any](max int, fn ValueFunc[T]) ValueFunc[T] {

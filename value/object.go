@@ -62,7 +62,7 @@ func (o *Object) Seal() {
 func (o *Object) At(ix Value) (Value, error) {
 	v, ok := o.values[ix.String()]
 	if !ok {
-		return undefined{}, nil
+		return Undefined(), nil
 	}
 	return v, nil
 }
@@ -73,16 +73,22 @@ func (o *Object) Get(prop string) (Value, error) {
 	}
 	v, ok := o.values[prop]
 	if !ok {
-		return undefined{}, nil
+		return Undefined(), nil
 	}
 	return v, nil
 }
 
-func (o *Object) Set(prop string, val Value) (Value, error) {
+func (o *Object) Set(prop string, val Value) error {
 	if o.frozen {
-		return nil, ErrOperation
+		return ErrOperation
 	}
-	return nil, nil
+	d := o.values[prop]
+	if !d.Writable {
+		return ErrOperation
+	}
+	d.Value = val
+	o.values[prop] = d
+	return nil
 }
 
 func (o *Object) Call(fn string, args []Value) (Value, error) {
