@@ -18,7 +18,6 @@ func defaultContext(ev env.Environ[value.Value]) *context {
 }
 
 type Module struct {
-
 }
 
 func Load() Module {
